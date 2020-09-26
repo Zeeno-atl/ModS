@@ -15,6 +15,10 @@ class TypeMissing : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
 };
+class RecursiveDependency : public std::runtime_error {
+public:
+	using runtime_error::runtime_error;
+};
 
 class Injector : public AbstractInjector {
 	class Private;

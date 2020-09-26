@@ -1,6 +1,7 @@
 #include <ModS/Injector.hpp>
 #include <boost/dll.hpp>
 #include <boost/range/adaptors.hpp>
+#include <deque>
 #include <functional>
 
 namespace ModS {
@@ -10,6 +11,7 @@ public:
 	std::map<std::filesystem::path, boost::dll::shared_library>       modules;
 	std::unordered_map<std::string, std::shared_ptr<AbstractFactory>> factories;
 	std::unordered_map<std::string, std::shared_ptr<void>>            shareds;
+	std::deque<std::string>                                           creating;
 
 	std::shared_ptr<AbstractModule> module(std::filesystem::path path) const {
 		return modules.at(path).get<std::shared_ptr<AbstractModule>>("ModSModule");
@@ -72,7 +74,14 @@ Pointer Injector::unique(std::string name) {
 	if (!p->factories.count(name))
 		throw TypeMissing("Type '" + name + "' is not registered. Probably shared object was not loaded.");
 
-	return p->factories.at(name)->create(this);
+	if (std::find(p->creating.begin(), p->creating.end(), name) != p->creating.end()) {
+		throw RecursiveDependency("Recursive dependency detected when creating " + name);
+	}
+
+	p->creating.push_back(name);
+	Pointer ptr = p->factories.at(name)->create(this);
+	p->creating.pop_back();
+	return ptr;
 }
 
 bool Injector::sharedObjectFilter(const std::filesystem::path &path) {
