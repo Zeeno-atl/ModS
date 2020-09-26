@@ -58,6 +58,9 @@ public:
 
 	static bool sharedObjectFilter(const std::filesystem::path &path);
 
+	std::vector<std::string> boundTypes() const;
+	std::vector<std::string> dependencies(const std::string &type) const;
+
 protected:
 	Zeeno::Signal<std::shared_ptr<AbstractFactory>> signalFactoryRegistered;
 

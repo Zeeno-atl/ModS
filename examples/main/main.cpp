@@ -30,6 +30,16 @@ int main() {
 
 	std::cout << "Ultimate answer is: " << x->answer() << std::endl;
 
+	std::cout << std::endl;
+	std::cout << "Here are all the dependencies" << std::endl;
+	for (auto type : injector.boundTypes()) {
+		std::cout << "\t" << type << ":";
+		for (auto dep : injector.dependencies(type))
+			std::cout << " " << dep;
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+
 	//do stuff
 	std::this_thread::sleep_for(std::chrono::seconds(3));
 

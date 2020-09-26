@@ -1,5 +1,6 @@
 #include <ModS/Injector.hpp>
 #include <boost/dll.hpp>
+#include <boost/range/adaptors.hpp>
 #include <functional>
 
 namespace ModS {
@@ -80,6 +81,15 @@ bool Injector::sharedObjectFilter(const std::filesystem::path &path) {
 #else
 	return path.extension() == ".dll";
 #endif
+}
+
+std::vector<std::string> Injector::boundTypes() const {
+	auto types = p->factories | boost::adaptors::map_keys;
+	return {types.begin(), types.end()};
+}
+
+std::vector<std::string> Injector::dependencies(const std::string &type) const {
+	return p->factories.at(type)->dependencies();
 }
 
 void Injector::onFactoryRegistered(std::shared_ptr<AbstractFactory> fac) {
