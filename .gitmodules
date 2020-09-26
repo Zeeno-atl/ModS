@@ -1,0 +1,3 @@
+[submodule "include/Signal"]
+	path = include/Signal
+	url = https://github.com/Zeeno-atl/Signal.git
