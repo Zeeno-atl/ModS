@@ -7,8 +7,8 @@
 namespace ModS {
 
 struct Pointer {
-	void *value{};
-	void (*deleter)(void *){};
+	void* value{};
+	void (*deleter)(void*){};
 
 	template<typename T>
 	std::shared_ptr<T> toSharedPtr() const {

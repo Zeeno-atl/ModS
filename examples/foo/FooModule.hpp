@@ -8,9 +8,11 @@ class IFooClass;
 
 class FooModule : public ModS::Module {
 	void bindTypes() override;
-	void initialize() override;
-	void finalize() override;
 
+	void startService() override;
+	void stopService() override;
+
+	// If you want to have something running all the time
 	std::shared_ptr<IFooClass> service;
 };
 

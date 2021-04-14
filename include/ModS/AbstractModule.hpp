@@ -2,10 +2,14 @@
 #ifndef _MODS_ABSTRACTMODULE_H
 #	define _MODS_ABSTRACTMODULE_H
 
-#	include <ModS/AbstractFactory.hpp>
+#	include <ModS/AbstractImplementationInfo.hpp>
+#	include <ModS/AbstractInterfaceInfo.hpp>
+#	include <ModS/AbstractRoute.hpp>
 #	include <ModS/AbstractInjector.hpp>
+#	include <ModS/Typename.hpp>
 #	include <Signal/Signal.hpp>
 #	include <memory>
+#	include <iostream>
 
 namespace ModS {
 class AbstractModule {
@@ -13,10 +17,14 @@ class AbstractModule {
 
 protected:
 	virtual void bindTypes() = 0;
-	virtual void initialize() {}
-	virtual void finalize() {}
+	virtual void startService() {
+	}
+	virtual void stopService() {
+	}
 
-	Zeeno::Signal<std::shared_ptr<AbstractFactory>> signalFactoryRegistered;
+	Zeeno::Signal<std::shared_ptr<AbstractImplementationInfo>> signalImplementationRegistered;
+	Zeeno::Signal<std::shared_ptr<AbstractInterfaceInfo>>      signalInterfaceRegistered;
+	Zeeno::Signal<std::shared_ptr<AbstractRoute>>              signalRouteRegistered;
 
 	template<typename T>
 	std::shared_ptr<T> shared() {
@@ -30,7 +38,7 @@ protected:
 	}
 
 private:
-	AbstractInjector *injector{};
+	AbstractInjector* injector{};
 };
 } // namespace ModS
 

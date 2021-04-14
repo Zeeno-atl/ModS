@@ -13,7 +13,8 @@ install(FILES include/Signal/Signal.hpp DESTINATION include/Signal)
 add_library(mods STATIC src/Injector.cpp)
 target_include_directories(mods PUBLIC include)
 
-find_library(BOOST 1.65 REQUIRED)
+find_library(BOOST 1.75 REQUIRED)
 target_include_directories(mods PRIVATE ${Boost_INCLUDE_DIRS})
+target_link_libraries(mods boost_system boost_filesystem)
 
 install(TARGETS mods DESTINATION lib/)

@@ -4,6 +4,7 @@
 
 #	if defined(__has_include) && __has_include(<boost/type_index.hpp>) && false
 #		include <boost/type_index.hpp>
+
 namespace ModS {
 
 template<class T>
@@ -18,31 +19,42 @@ std::string pretty_name() {
 #		include <iostream>
 #		include <stdexcept>
 #		include <string>
+#		include <vector>
 
 class static_string {
-	const char *const p_;
+	const char* const p_;
 	const std::size_t sz_;
 
 public:
-	typedef const char *const_iterator;
+	typedef const char* const_iterator;
 
 	template<std::size_t N>
-	constexpr static_string(const char (&a)[N]) noexcept : p_(a), sz_(N - 1) {}
-	constexpr static_string(const char *p, std::size_t N) noexcept : p_(p), sz_(N) {}
-	constexpr const char *   data() const noexcept { return p_; }
-	constexpr std::size_t    size() const noexcept { return sz_; }
-	constexpr const_iterator begin() const noexcept { return p_; }
-	constexpr const_iterator end() const noexcept { return p_ + sz_; }
-	constexpr char           operator[](std::size_t n) const {
-        return n < sz_ ? p_[n] : throw std::out_of_range("static_string");
+	constexpr static_string(const char (&a)[N]) noexcept : p_(a), sz_(N - 1) {
+	}
+	constexpr static_string(const char* p, std::size_t N) noexcept : p_(p), sz_(N) {
+	}
+	constexpr const char* data() const noexcept {
+		return p_;
+	}
+	constexpr std::size_t size() const noexcept {
+		return sz_;
+	}
+	constexpr const_iterator begin() const noexcept {
+		return p_;
+	}
+	constexpr const_iterator end() const noexcept {
+		return p_ + sz_;
+	}
+	constexpr char operator[](std::size_t n) const {
+		return n < sz_ ? p_[n] : throw std::out_of_range("static_string");
 	}
 };
 
-inline std::ostream &operator<<(std::ostream &os, const static_string &s) {
+inline std::ostream& operator<<(std::ostream& os, const static_string& s) {
 	return os.write(s.data(), s.size());
 }
 
-inline std::string static_to_string(const static_string &s) {
+inline std::string static_to_string(const static_string& s) {
 	return std::string(s.begin(), s.end());
 }
 
@@ -72,5 +84,19 @@ std::string pretty_name() {
 } // namespace ModS
 
 #	endif // no boost/type_index
+
+namespace ModS {
+
+template<typename... Args>
+std::vector<std::string> pretty_names(std::tuple<>) {
+	return {};
+}
+
+template<typename... Args>
+std::vector<std::string> pretty_names(std::tuple<Args...>) {
+	return {(pretty_name<Args>(), ...)};
+}
+
+} // namespace ModS
 
 #endif // TYPENAME_HPP

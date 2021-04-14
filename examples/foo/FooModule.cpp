@@ -1,18 +1,25 @@
 #include "FooModule.hpp"
 #include "FooClass.hpp"
 
-__attribute__((visibility("default"))) std::shared_ptr<FooModule> ModSModule = std::make_shared<FooModule>();
+#include "IFooClass.hpp"
+
+MODS_MODULE(FooModule)
 
 void FooModule::bindTypes() {
 	//Register FooClass to be provided appwide
-	bind<IFooClass, FooClass>();
+
+	publishInterfaces<IFooClass>();
+	publishImplementations<FooClass>();
+	routeInterfaces<FooClass, IFooClass>();
+	// or simply
+	// bind<IFooClass, FooClass>();
 }
 
-void FooModule::initialize() {
+void FooModule::startService() {
 	//make FooClass to exist until finalize is called
 	service = shared<IFooClass>();
 }
 
-void FooModule::finalize() {
+void FooModule::stopService() {
 	service.reset();
 }

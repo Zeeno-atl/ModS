@@ -9,8 +9,8 @@
 namespace ModS {
 class AbstractInjector {
 public:
-	virtual std::shared_ptr<void> shared(std::string) = 0;
-	virtual Pointer               unique(std::string) = 0;
+	[[nodiscard]] virtual std::shared_ptr<void> shared(const std::string_view typeName) = 0;
+	[[nodiscard]] virtual Pointer               unique(const std::string_view typeName) = 0;
 };
 
 } // namespace ModS

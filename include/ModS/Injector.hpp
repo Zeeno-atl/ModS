@@ -1,13 +1,14 @@
 #pragma once
 #ifndef _MODS_INJECTOR_HPP
-#define _MODS_INJECTOR_HPP
+#	define _MODS_INJECTOR_HPP
 
-#	include <ModS/Factory.hpp>
-#	include <ModS/AbstractModule.hpp>
+#	include <ModS/Module.hpp>
 #	include <ModS/Typename.hpp>
 #	include <Signal/Signal.hpp>
 #	include <concepts>
 #	include <filesystem>
+#	include <stdexcept>
+#	include <ranges>
 
 namespace ModS {
 
@@ -16,6 +17,10 @@ public:
 	using runtime_error::runtime_error;
 };
 class RecursiveDependency : public std::runtime_error {
+public:
+	using runtime_error::runtime_error;
+};
+class RecursiveRouting : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
 };
@@ -29,17 +34,19 @@ public:
 
 	bool addDynamicObject(std::filesystem::path);
 
-	template<std::predicate<std::filesystem::path> P = std::function<bool(const std::filesystem::path &)>>
+	template<std::predicate<std::filesystem::path> P = std::function<bool(const std::filesystem::path&)>>
 	void addDynamicObjectDirectory(std::filesystem::path path, P filter = &sharedObjectFilter) {
-		for (auto f : std::filesystem::directory_iterator(path))
-			if (filter(f))
+		for (auto f : std::filesystem::directory_iterator(path)) {
+			if (filter(f)) {
 				addDynamicObject(f);
+			}
+		}
 	}
 
-	void initialize(std::filesystem::path filepath);
-	void initialize();
-	void finalize(std::filesystem::path filepath);
-	void finalize();
+	void startService(std::filesystem::path filepath);
+	void startService();
+	void stopService(std::filesystem::path filepath);
+	void stopService();
 
 	template<typename T>
 	[[nodiscard]] std::shared_ptr<T> shared() {
@@ -51,24 +58,71 @@ public:
 		return unique(pretty_name<T>());
 	}
 
-	[[nodiscard]] std::shared_ptr<void> shared(std::string typeName) override;
-	[[nodiscard]] Pointer               unique(std::string typeName) override;
+	[[nodiscard]] std::shared_ptr<void> shared(const std::string_view typeName) override;
+	[[nodiscard]] Pointer               unique(const std::string_view typeName) override;
 
 	template<typename Interface, typename Implementation = Interface>
 	void bind() {
-		std::shared_ptr<Factory<Interface, Implementation>> fac = std::make_shared<Factory<Interface, Implementation>>();
-		signalFactoryRegistered(fac);
+		publishInterface<Interface>();
+		publishImplementation<Implementation>();
+		routeInterfaces<Implementation, Interface>();
 	}
 
-	static bool sharedObjectFilter(const std::filesystem::path &path);
+	template<typename... Interfaces>
+	void publishInterfaces() {
+		auto dummy = {publishInterface<Interfaces>()...};
+	}
 
-	std::vector<std::string> boundTypes() const;
-	std::vector<std::string> dependencies(const std::string &type) const;
+	template<typename... Implementations>
+	void publishImplementations() {
+		auto dummy = {publishImplementation<Implementations>()...};
+	}
+
+	template<typename Implementation>
+	void routeInterfaces() {
+	}
+
+	template<typename Implementation, typename Interface, typename... Interfaces>
+	void routeInterfaces() {
+		using R = Route<Interface, Implementation>;
+		signalRouteRegistered(std::make_shared<R>());
+
+		routeInterfaces<Implementation, Interfaces...>();
+	}
+
+private:
+	template<typename Interface>
+	bool publishInterface() {
+		std::shared_ptr<InterfaceInfo<Interface>> interface = std::make_shared<InterfaceInfo<Interface>>();
+		signalInterfaceRegistered(interface);
+		return true;
+	}
+
+	template<typename Implementation>
+	bool publishImplementation() {
+		std::shared_ptr<ImplementationInfo<Implementation>> implementation = std::make_shared<ImplementationInfo<Implementation>>();
+		signalImplementationRegistered(implementation);
+		return true;
+	}
+
+public:
+	static bool sharedObjectFilter(const std::filesystem::path& path);
+
+	std::vector<std::string>                         interfaces() const;
+	std::vector<std::string>                         implementations() const;
+	std::vector<std::string>                         implementationDependencies(const std::string_view implementation) const;
+	std::vector<std::pair<std::string, std::string>> routes() const;
 
 protected:
-	Zeeno::Signal<std::shared_ptr<AbstractFactory>> signalFactoryRegistered;
+	Zeeno::Signal<std::shared_ptr<AbstractImplementationInfo>> signalImplementationRegistered;
+	Zeeno::Signal<std::shared_ptr<AbstractInterfaceInfo>>      signalInterfaceRegistered;
+	Zeeno::Signal<std::shared_ptr<AbstractRoute>>              signalRouteRegistered;
 
-	void onFactoryRegistered(std::shared_ptr<AbstractFactory>);
+	std::shared_ptr<AbstractImplementationInfo> route(const std::string_view iface) const;
+
+	void onImplementationRegistered(std::shared_ptr<AbstractImplementationInfo>);
+	void onInterfaceRegistered(std::shared_ptr<AbstractInterfaceInfo>);
+	void onRouteRegistered(std::shared_ptr<AbstractRoute>);
 };
 
 } // namespace ModS
