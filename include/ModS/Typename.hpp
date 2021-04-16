@@ -94,7 +94,7 @@ std::vector<std::string> pretty_names(std::tuple<>) {
 
 template<typename... Args>
 std::vector<std::string> pretty_names(std::tuple<Args...>) {
-	return {(pretty_name<Args>(), ...)};
+	return {pretty_name<Args>()...};
 }
 
 } // namespace ModS
