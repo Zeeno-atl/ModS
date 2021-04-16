@@ -50,9 +50,9 @@ bool Injector::addDynamicObject(std::filesystem::path filepath) {
 	p->modules[filepath] = std::move(library);
 	auto module          = p->module(filepath);
 	module->injector     = this;
-	module->signalImplementationRegistered.connect([this](std::shared_ptr<AbstractImplementationInfo> impl) { onImplementationRegistered(impl); });
-	module->signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { onInterfaceRegistered(iface); });
-	module->signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { onRouteRegistered(route); });
+	module->signalImplementationRegistered.connect([this](std::shared_ptr<AbstractImplementationInfo> impl) { signalImplementationRegistered(impl); });
+	module->signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { signalInterfaceRegistered(iface); });
+	module->signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { signalRouteRegistered(route); });
 	module->bindTypes();
 	return true;
 }

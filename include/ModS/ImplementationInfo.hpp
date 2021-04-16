@@ -42,7 +42,9 @@ private:
 	template<typename... Args>
 	static Pointer construct(AbstractInjector* inj, std::tuple<Args...>) {
 		Pointer p;
-		p.value   = new Implementation((Pull<Args>::pull(inj))...);
+#	ifndef __llvm__
+		p.value = new Implementation((Pull<Args>::pull(inj))...);
+#	endif
 		p.deleter = &destroy;
 		return p;
 	}

@@ -1,3 +1,4 @@
+#include <ModS/GraphViz.hpp>
 #include <ModS/Injector.hpp>
 #include <iostream>
 #include <thread>
@@ -59,6 +60,8 @@ int main() {
 		std::cout << "\t" << iface << " -> " << impl << std::endl;
 	}
 	std::cout << std::endl;
+
+	std::cout << injector;
 
 	//do stuff
 	std::this_thread::sleep_for(std::chrono::seconds(3));

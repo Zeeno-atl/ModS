@@ -90,7 +90,12 @@ public:
 		routeInterfaces<Implementation, Interfaces...>();
 	}
 
-private:
+	inline void routeInterfaces(const std::string& implementation, const std::vector<std::string>& interfaces) {
+		for (const auto& iface : interfaces) {
+			signalRouteRegistered(std::make_shared<Route<std::nullptr_t, std::nullptr_t>>(iface, implementation));
+		}
+	}
+
 	template<typename Interface>
 	bool publishInterface() {
 		std::shared_ptr<InterfaceInfo<Interface>> interface = std::make_shared<InterfaceInfo<Interface>>();
@@ -105,21 +110,20 @@ private:
 		return true;
 	}
 
-public:
 	static bool sharedObjectFilter(const std::filesystem::path& path);
 
-	std::vector<std::string>                         interfaces() const;
-	std::vector<std::string>                         implementations() const;
-	std::vector<std::string>                         implementationDependencies(const std::string_view implementation) const;
-	std::vector<std::pair<std::string, std::string>> routes() const;
+	std::vector<std::string>                         interfaces() const override;
+	std::vector<std::string>                         implementations() const override;
+	std::vector<std::string>                         implementationDependencies(const std::string_view implementation) const override;
+	std::vector<std::pair<std::string, std::string>> routes() const override;
 
-protected:
 	Zeeno::Signal<std::shared_ptr<AbstractImplementationInfo>> signalImplementationRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractInterfaceInfo>>      signalInterfaceRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractRoute>>              signalRouteRegistered;
 
 	std::shared_ptr<AbstractImplementationInfo> route(const std::string_view iface) const;
 
+protected:
 	void onImplementationRegistered(std::shared_ptr<AbstractImplementationInfo>);
 	void onInterfaceRegistered(std::shared_ptr<AbstractInterfaceInfo>);
 	void onRouteRegistered(std::shared_ptr<AbstractRoute>);
