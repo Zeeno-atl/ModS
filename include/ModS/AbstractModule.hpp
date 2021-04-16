@@ -7,7 +7,7 @@
 #	include <ModS/AbstractRoute.hpp>
 #	include <ModS/AbstractInjector.hpp>
 #	include <ModS/Typename.hpp>
-#	include <Signal/Signal.hpp>
+#	include <Signal.hpp>
 #	include <memory>
 #	include <iostream>
 

@@ -18,14 +18,18 @@ public:
 	std::string interfaceName() const override {
 		return pretty_name<Interface>();
 	}
+
+	std::int32_t priority() const override {
+		return 0;
+	}
 };
 
 template<>
 class Route<std::nullptr_t, std::nullptr_t> : public AbstractRoute {
 	std::string interface, implementation;
-
+	std::int32_t _priority{};
 public:
-	Route(std::string interface, std::string implementation) : interface(std::move(interface)), implementation(std::move(implementation)) {
+	Route(std::string interface, std::string implementation, std::int32_t priority = 0) : interface(std::move(interface)), implementation(std::move(implementation)), _priority(priority) {
 	}
 
 	std::string implementationName() const override {
@@ -34,6 +38,10 @@ public:
 
 	std::string interfaceName() const override {
 		return interface;
+	}
+
+	std::int32_t priority() const override {
+		return _priority;
 	}
 };
 

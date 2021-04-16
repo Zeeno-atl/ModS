@@ -16,7 +16,7 @@ public:
 	virtual std::vector<std::string>                         interfaces() const                                                      = 0;
 	virtual std::vector<std::string>                         implementations() const                                                 = 0;
 	virtual std::vector<std::string>                         implementationDependencies(const std::string_view implementation) const = 0;
-	virtual std::vector<std::pair<std::string, std::string>> routes() const                                                          = 0;
+	virtual std::vector<std::tuple<std::string, std::string, std::int32_t>> routes() const                                                          = 0;
 };
 
 } // namespace ModS

@@ -10,23 +10,27 @@ inline std::ostream& operator<<(std::ostream& os, AbstractInjector& injector) {
 	os << "digraph ModS {" << std::endl;
 
 	for (const auto& iface : injector.interfaces()) {
-		os << "\t\"" << iface << "\";" << std::endl;
+		os << "\t\"<<interface>> " << iface << "\";" << std::endl;
 	}
 
+    for (const auto& impl : injector.implementations()) {
+		os << "\t\"" << impl << "\";" << std::endl;
+    }
+	
 	for (const auto& impl : injector.implementations()) {
 		std::string deps;
 		for (const auto& dep : injector.implementationDependencies(impl)) {
 			deps += "\"" + dep + "\", ";
 		}
+		os << "\t\"" << impl << "\"";
 		if (!deps.empty()) {
-			os << "\t\"" << impl << "\" -> ";
-			os << deps.substr(0, deps.size() - 2);
-			os << ";" << std::endl;
+			os << " -> " << deps.substr(0, deps.size() - 2) << " [arrowhead = vee, style = dashed]";
 		}
+		os << ";" << std::endl;
 	}
 
-	for (const auto& [iface, impl] : injector.routes()) {
-		os << "\t\"" << impl << "\" -> \"" << iface << "\" [arrowhead = open, style = dashed];" << std::endl;
+	for (const auto& [iface, impl, priority] : injector.routes()) {
+		os << "\t\"" << impl << "\" -> \"<<interface>> " << iface << "\" [arrowhead = onormal, style = dashed, label = \"p = " << priority << "\"];" << std::endl;
 	}
 
 	os << "}";

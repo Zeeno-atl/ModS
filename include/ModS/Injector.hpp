@@ -4,7 +4,7 @@
 
 #	include <ModS/Module.hpp>
 #	include <ModS/Typename.hpp>
-#	include <Signal/Signal.hpp>
+#	include <Signal.hpp>
 #	include <concepts>
 #	include <filesystem>
 #	include <stdexcept>
@@ -115,7 +115,7 @@ public:
 	std::vector<std::string>                         interfaces() const override;
 	std::vector<std::string>                         implementations() const override;
 	std::vector<std::string>                         implementationDependencies(const std::string_view implementation) const override;
-	std::vector<std::pair<std::string, std::string>> routes() const override;
+	std::vector<std::tuple<std::string, std::string, std::int32_t>> routes() const override;
 
 	Zeeno::Signal<std::shared_ptr<AbstractImplementationInfo>> signalImplementationRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractInterfaceInfo>>      signalInterfaceRegistered;

@@ -6,12 +6,18 @@
 
 namespace ModS {
 
+struct RouteCompare {
+  bool operator() (const std::shared_ptr<AbstractRoute>& lhs, const std::shared_ptr<AbstractRoute>&rhs) const {
+    return lhs->priority() > rhs->priority();
+  }
+};
+
 class Injector::Private {
 public:
 	std::map<std::filesystem::path, boost::dll::shared_library>                  modules;
 	std::unordered_map<std::string, std::shared_ptr<AbstractImplementationInfo>> implementations;
 	std::unordered_map<std::string, std::shared_ptr<AbstractInterfaceInfo>>      interfaces;
-	std::unordered_map<std::string, std::shared_ptr<AbstractRoute>>              routes;
+	std::map<std::int32_t, std::vector<std::shared_ptr<AbstractRoute>>, std::greater<>>            routes;
 	std::unordered_map<std::string, std::shared_ptr<void>>                       shareds;
 	std::deque<std::string_view>                                                 creating;
 
@@ -117,12 +123,21 @@ std::vector<std::string> Injector::implementations() const {
 	return {types.begin(), types.end()};
 }
 
-std::vector<std::pair<std::string, std::string>> Injector::routes() const {
-	auto rts = p->routes | std::views::values | std::views::transform([](std::shared_ptr<AbstractRoute> route) -> std::pair<std::string, std::string> {
-		           return std::make_pair(route->interfaceName(), route->implementationName());
+std::vector<std::tuple<std::string, std::string, std::int32_t>> Injector::routes() const {
+	/*auto rts = p->routes | std::views::values | std::views::join | std::views::transform([](std::shared_ptr<AbstractRoute> route) {
+		           return std::make_tuple(route->interfaceName(), route->implementationName(), route->priority());
 	           })
 	           | std::views::common;
-	return {rts.begin(), rts.end()};
+	return {rts.begin(), rts.end()};*/
+	std::vector<std::tuple<std::string, std::string, std::int32_t>> rts;
+
+	for(const auto& table : p->routes | std::views::values) {
+		for(const auto& r : table) {
+			rts.push_back(std::make_tuple(r->interfaceName(), r->implementationName(), r->priority()));
+		}
+	}
+	
+	return rts;
 }
 
 std::vector<std::string> Injector::implementationDependencies(const std::string_view type) const {
@@ -138,28 +153,33 @@ void Injector::onInterfaceRegistered(std::shared_ptr<AbstractInterfaceInfo> ifac
 }
 
 void Injector::onRouteRegistered(std::shared_ptr<AbstractRoute> route) {
-	p->routes[route->interfaceName()] = route;
+	p->routes[route->priority()].emplace_back(route);
 }
 
 std::shared_ptr<AbstractImplementationInfo> Injector::route(const std::string_view iface) const {
 	std::string             resolved{iface};
 	std::deque<std::string> path;
 	path.emplace_back(resolved);
-
-	while (p->routes.contains(resolved)) {
-		resolved = p->routes.at(resolved)->implementationName();
-
-		if (std::find(path.cbegin(), path.cend(), resolved) != path.cend()) {
-			throw RecursiveRouting("There is a recursive routing for interface '" + std::string(iface) + "'.");
+        
+	bool found = true;
+	while(found) {
+		found = false;
+		for(const auto& table : p->routes | std::views::values) {
+			if(auto it = std::ranges::find_if(table, [&resolved](const std::shared_ptr<AbstractRoute>& r){ return r->implementationName() == resolved;}); it != table.end()) {
+				resolved = (*it)->implementationName();
+				if (std::ranges::find(path, resolved) != path.end()) {
+					throw RecursiveRouting("There is a recursive routing for interface '" + std::string(iface) + "'.");
+				}
+				path.emplace_back(resolved);
+				found = true;
+				break;
+			}
 		}
-
-		path.emplace_back(resolved);
-	}
-
-	if (!p->implementations.contains(resolved)) {
-		throw TypeMissing("Route ended at unregistered type '" + resolved + "'.");
-	}
-
+		
+		if(!found) {
+			throw TypeMissing("Route ended at unregistered type '" + resolved + "'.");
+		}
+    }
 	return p->implementations.at(resolved);
 }
 

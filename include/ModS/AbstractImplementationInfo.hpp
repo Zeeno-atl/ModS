@@ -4,7 +4,6 @@
 
 #	include <ModS/AbstractInjector.hpp>
 #	include <ModS/Pointer.hpp>
-#	include <memory>
 #	include <string>
 #	include <vector>
 
