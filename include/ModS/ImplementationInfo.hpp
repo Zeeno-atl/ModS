@@ -17,13 +17,15 @@ public:
 	std::string implementationName() const override {
 		return pretty_name<Implementation>();
 	}
+
 	std::vector<std::string> dependencies() const override {
 		return pretty_names(refl::as_tuple<Implementation>());
 	}
 
 private:
 	template<typename X>
-	struct Pull {};
+	struct Pull {
+	};
 
 	template<typename X>
 	struct Pull<std::shared_ptr<X>> {
@@ -51,6 +53,31 @@ private:
 
 	static void destroy(void* ptr) {
 		delete reinterpret_cast<Implementation*>(ptr);
+	}
+};
+
+template<typename Interface>
+class ImplementationFactory : public AbstractImplementationInfo {
+	using Factory = std::function<std::shared_ptr<Interface>()>;
+	Factory factory;
+public:
+	ImplementationFactory(Factory factory)
+		: factory(factory) {
+	}
+
+	Pointer create(AbstractInjector* inj) override {
+		Pointer ret;
+		auto    sharedPtr = factory();
+		ret.value         = sharedPtr.get();
+		return ret;
+	}
+
+	std::string implementationName() const override {
+		return pretty_name<ImplementationFactory<Interface>>();
+	}
+
+	std::vector<std::string> dependencies() const override {
+		return {};
 	}
 };
 

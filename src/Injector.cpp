@@ -165,7 +165,7 @@ std::shared_ptr<AbstractImplementationInfo> Injector::route(const std::string_vi
 	while(found) {
 		found = false;
 		for(const auto& table : p->routes | std::views::values) {
-			if(auto it = std::ranges::find_if(table, [&resolved](const std::shared_ptr<AbstractRoute>& r){ return r->implementationName() == resolved;}); it != table.end()) {
+			if(auto it = std::ranges::find_if(table, [&resolved](const std::shared_ptr<AbstractRoute>& r){ return r->interfaceName() == resolved;}); it != table.end()) {
 				resolved = (*it)->implementationName();
 				if (std::ranges::find(path, resolved) != path.end()) {
 					throw RecursiveRouting("There is a recursive routing for interface '" + std::string(iface) + "'.");
@@ -176,7 +176,7 @@ std::shared_ptr<AbstractImplementationInfo> Injector::route(const std::string_vi
 			}
 		}
 		
-		if(!found) {
+		if(!found && !p->implementations.contains(resolved)) {
 			throw TypeMissing("Route ended at unregistered type '" + resolved + "'.");
 		}
     }

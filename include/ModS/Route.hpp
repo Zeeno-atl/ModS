@@ -10,7 +10,12 @@ namespace ModS {
 
 template<typename Interface, typename Implementation>
 class Route : public AbstractRoute {
+	std::int32_t _priority{};
 public:
+	Route(std::int32_t priority = 0)
+		: _priority(priority) {
+	}
+
 	std::string implementationName() const override {
 		return pretty_name<Implementation>();
 	}
@@ -20,16 +25,17 @@ public:
 	}
 
 	std::int32_t priority() const override {
-		return 0;
+		return _priority;
 	}
 };
 
 template<>
 class Route<std::nullptr_t, std::nullptr_t> : public AbstractRoute {
-	std::string interface, implementation;
+	std::string  interface, implementation;
 	std::int32_t _priority{};
 public:
-	Route(std::string interface, std::string implementation, std::int32_t priority = 0) : interface(std::move(interface)), implementation(std::move(implementation)), _priority(priority) {
+	Route(std::string interface, std::string implementation, std::int32_t priority = 0)
+		: interface(std::move(interface)), implementation(std::move(implementation)), _priority(priority) {
 	}
 
 	std::string implementationName() const override {

@@ -77,7 +77,14 @@ public:
 	void publishImplementations() {
 		auto dummy = {publishImplementation<Implementations>()...};
 	}
-
+	
+	template<typename Interface>
+	void routeToFactory(std::function<std::shared_ptr<Interface>()> factory, std::int32_t priority = 1) {
+		signalInterfaceRegistered(std::make_shared<InterfaceInfo<Interface>>());
+		signalImplementationRegistered(std::make_shared<ImplementationFactory<Interface>>(factory));
+		signalRouteRegistered(std::make_shared<Route<Interface, ImplementationFactory<Interface>>>(priority));
+	}
+	
 	template<typename Implementation>
 	void routeInterfaces() {
 	}
@@ -92,7 +99,7 @@ public:
 
 	inline void routeInterfaces(const std::string& implementation, const std::vector<std::string>& interfaces) {
 		for (const auto& iface : interfaces) {
-			signalRouteRegistered(std::make_shared<Route<std::nullptr_t, std::nullptr_t>>(iface, implementation));
+			signalRouteRegistered(std::make_shared<Route<std::nullptr_t, std::nullptr_t>>(iface, implementation, 1));
 		}
 	}
 
