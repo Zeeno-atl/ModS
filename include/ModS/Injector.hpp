@@ -16,10 +16,12 @@ class TypeMissing : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
 };
+
 class RecursiveDependency : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
 };
+
 class RecursiveRouting : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
@@ -31,6 +33,7 @@ class Injector : public AbstractInjector {
 
 public:
 	Injector();
+	~Injector() override;
 
 	bool addDynamicObject(std::filesystem::path);
 
@@ -77,14 +80,14 @@ public:
 	void publishImplementations() {
 		auto dummy = {publishImplementation<Implementations>()...};
 	}
-	
-	template<typename Interface>
-	void routeToFactory(std::function<std::shared_ptr<Interface>()> factory, std::int32_t priority = 1) {
+
+	template<typename Interface, typename Implementation>
+	void routeToFactory(std::function<std::shared_ptr<Implementation>()> factory, std::int32_t priority = 1) {
 		signalInterfaceRegistered(std::make_shared<InterfaceInfo<Interface>>());
-		signalImplementationRegistered(std::make_shared<ImplementationFactory<Interface>>(factory));
-		signalRouteRegistered(std::make_shared<Route<Interface, ImplementationFactory<Interface>>>(priority));
+		signalImplementationRegistered(std::make_shared<ImplementationFactory<Interface, Implementation>>(factory));
+		signalRouteRegistered(std::make_shared<Route<Interface, ImplementationFactory<Interface, Implementation>>>(priority));
 	}
-	
+
 	template<typename Implementation>
 	void routeInterfaces() {
 	}
@@ -119,11 +122,11 @@ public:
 
 	static bool sharedObjectFilter(const std::filesystem::path& path);
 
-	std::vector<std::string>                         interfaces() const override;
-	std::vector<std::string>                         implementations() const override;
-	std::vector<std::string>                         implementationDependencies(const std::string_view implementation) const override;
+	std::vector<std::string>                                        interfaces() const override;
+	std::vector<std::string>                                        implementations() const override;
+	std::vector<std::string>                                        implementationDependencies(const std::string_view implementation) const override;
 	std::vector<std::tuple<std::string, std::string, std::int32_t>> routes() const override;
-
+        
 	Zeeno::Signal<std::shared_ptr<AbstractImplementationInfo>> signalImplementationRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractInterfaceInfo>>      signalInterfaceRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractRoute>>              signalRouteRegistered;
@@ -131,9 +134,9 @@ public:
 	std::shared_ptr<AbstractImplementationInfo> route(const std::string_view iface) const;
 
 protected:
-	void onImplementationRegistered(std::shared_ptr<AbstractImplementationInfo>);
-	void onInterfaceRegistered(std::shared_ptr<AbstractInterfaceInfo>);
-	void onRouteRegistered(std::shared_ptr<AbstractRoute>);
+	void onImplementationRegistered(const std::shared_ptr<AbstractImplementationInfo>&);
+	void onInterfaceRegistered(const std::shared_ptr<AbstractInterfaceInfo>&);
+	void onRouteRegistered(const std::shared_ptr<AbstractRoute>&);
 };
 
 } // namespace ModS

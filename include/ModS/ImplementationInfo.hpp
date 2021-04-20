@@ -13,6 +13,10 @@ public:
 	Pointer create(AbstractInjector* inj) override {
 		return construct(inj, refl::as_tuple<Implementation>());
 	}
+	
+	std::shared_ptr<void> create() const override {
+		return nullptr;
+	}
 
 	std::string implementationName() const override {
 		return pretty_name<Implementation>();
@@ -20,6 +24,10 @@ public:
 
 	std::vector<std::string> dependencies() const override {
 		return pretty_names(refl::as_tuple<Implementation>());
+	}
+        
+	bool isFactoryType() const override {
+		return false;
 	}
 
 private:
@@ -52,32 +60,37 @@ private:
 	}
 
 	static void destroy(void* ptr) {
-		delete reinterpret_cast<Implementation*>(ptr);
+		delete static_cast<Implementation*>(ptr);
 	}
 };
 
-template<typename Interface>
+template<typename Interface, typename Implementation>
 class ImplementationFactory : public AbstractImplementationInfo {
-	using Factory = std::function<std::shared_ptr<Interface>()>;
+	using Factory = std::function<std::shared_ptr<Implementation>()>;
 	Factory factory;
 public:
 	ImplementationFactory(Factory factory)
 		: factory(factory) {
 	}
 
+	std::shared_ptr<void> create() const override {
+		return factory();
+	}
+
 	Pointer create(AbstractInjector* inj) override {
-		Pointer ret;
-		auto    sharedPtr = factory();
-		ret.value         = sharedPtr.get();
-		return ret;
+		return {};
 	}
 
 	std::string implementationName() const override {
-		return pretty_name<ImplementationFactory<Interface>>();
+		return pretty_name<ImplementationFactory<Interface, Implementation>>();
 	}
 
 	std::vector<std::string> dependencies() const override {
 		return {};
+	}
+	
+	bool isFactoryType() const override {
+		return true;
 	}
 };
 
