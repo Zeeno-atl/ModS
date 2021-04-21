@@ -16,9 +16,9 @@ struct RouteCompare {
 class Injector::Private {
 public:
 	std::map<std::int32_t, std::vector<std::shared_ptr<AbstractRoute>>, std::greater<>> routes;
+	std::unordered_map<std::string, std::shared_ptr<void>>                              shareds;
 	std::unordered_map<std::string, std::shared_ptr<AbstractInterfaceInfo>>             interfaces;
 	std::unordered_map<std::string, std::shared_ptr<AbstractImplementationInfo>>        implementations;
-	std::unordered_map<std::string, std::shared_ptr<void>>                              shareds;
 	std::deque<std::string_view>                                                        creating;
 	std::vector<std::shared_ptr<Zeeno::Connection>>                                     connections;
 	std::map<std::filesystem::path, boost::dll::shared_library>                         modules;
@@ -36,18 +36,6 @@ public:
 
 	std::shared_ptr<AbstractModule> module(const std::filesystem::path& path) const {
 		return modules.at(path).get<std::shared_ptr<AbstractModule>>(mangledFactoryName(path));
-	}
-
-	~Private() {
-		for (auto conn : connections) {
-			conn->disconnect();
-		}
-
-		routes.clear();
-		interfaces.clear();
-		shareds.clear();
-		implementations.clear();
-		modules.clear();
 	}
 };
 
@@ -72,6 +60,17 @@ Injector::~Injector() {
 	signalImplementationRegistered.disconnectAll();
 	signalInterfaceRegistered.disconnectAll();
 	signalRouteRegistered.disconnectAll();
+
+	for (auto c : p->connections) {
+		c->disconnect();
+	}
+	p->connections.clear();
+
+	clearShareds();
+	p->routes.clear();
+	p->interfaces.clear();
+	p->implementations.clear();
+	
 	p.reset();
 }
 
@@ -130,6 +129,10 @@ void Injector::stopService() {
 	for (const auto pair : p->modules) {
 		stopService(pair.first);
 	}
+}
+
+void Injector::clearShareds() {
+	p->shareds.clear();
 }
 
 std::shared_ptr<void> Injector::shared(const std::string_view name) {

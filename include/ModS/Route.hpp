@@ -31,7 +31,8 @@ public:
 
 template<>
 class Route<std::nullptr_t, std::nullptr_t> : public AbstractRoute {
-	std::string  interface, implementation;
+	std::string  interface;
+	std::string implementation;
 	std::int32_t _priority{};
 public:
 	Route(std::string interface, std::string implementation, std::int32_t priority = 0)

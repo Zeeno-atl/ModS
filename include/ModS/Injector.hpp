@@ -51,6 +51,8 @@ public:
 	void stopService(std::filesystem::path filepath);
 	void stopService();
 
+	void clearShareds();
+
 	template<typename T>
 	[[nodiscard]] std::shared_ptr<T> shared() {
 		return std::static_pointer_cast<T>(shared(pretty_name<T>()));
