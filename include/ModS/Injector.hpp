@@ -67,7 +67,7 @@ public:
 	[[nodiscard]] Pointer               unique(const std::string_view typeName) override;
 
 	template<typename Interface, typename Implementation = Interface>
-	void bind() {
+	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> bind() {
 		publishInterface<Interface>();
 		publishImplementation<Implementation>();
 		routeInterfaces<Implementation, Interface>();
@@ -84,10 +84,12 @@ public:
 	}
 
 	template<typename Interface, typename Implementation>
-	void routeToFactory(std::function<std::shared_ptr<Implementation>()> factory, std::int32_t priority = 1) {
+	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> routeToFactory(
+		std::function<std::shared_ptr<Implementation>()> factory,
+		std::int32_t                                     priority = 1) {
 		signalInterfaceRegistered(std::make_shared<InterfaceInfo<Interface>>());
-		signalImplementationRegistered(std::make_shared<ImplementationFactory<Interface, Implementation>>(factory));
-		signalRouteRegistered(std::make_shared<Route<Interface, ImplementationFactory<Interface, Implementation>>>(priority));
+		signalImplementationRegistered(std::make_shared<ImplementationFactory<Implementation>>(factory));
+		signalRouteRegistered(std::make_shared<FactoryRoute<Interface, Implementation>>(priority));
 	}
 
 	template<typename Implementation>
@@ -95,16 +97,17 @@ public:
 	}
 
 	template<typename Implementation, typename Interface, typename... Interfaces>
-	void routeInterfaces() {
+	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> routeInterfaces() {
 		using R = Route<Interface, Implementation>;
 		signalRouteRegistered(std::make_shared<R>());
 
 		routeInterfaces<Implementation, Interfaces...>();
 	}
 
-	inline void routeInterfaces(const std::string& implementation, const std::vector<std::string>& interfaces) {
+	inline void routeInterfaces(const std::string& implementation, const std::vector<std::string>& interfaces, std::int32_t priority = 1) {
 		for (const auto& iface : interfaces) {
-			signalRouteRegistered(std::make_shared<Route<std::nullptr_t, std::nullptr_t>>(iface, implementation, 1));
+			auto [impl, route] = resolve(iface); //check if the route already exists (it is possible to cast)
+			signalRouteRegistered(std::make_shared<Route<std::nullptr_t, std::nullptr_t>>(route, iface, implementation, priority));
 		}
 	}
 
@@ -128,12 +131,12 @@ public:
 	std::vector<std::string>                                        implementations() const override;
 	std::vector<std::string>                                        implementationDependencies(const std::string_view implementation) const override;
 	std::vector<std::tuple<std::string, std::string, std::int32_t>> routes() const override;
-        
+
 	Zeeno::Signal<std::shared_ptr<AbstractImplementationInfo>> signalImplementationRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractInterfaceInfo>>      signalInterfaceRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractRoute>>              signalRouteRegistered;
 
-	std::shared_ptr<AbstractImplementationInfo> route(const std::string_view iface) const;
+	std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> resolve(const std::string_view iface) const;
 
 protected:
 	void onImplementationRegistered(const std::shared_ptr<AbstractImplementationInfo>&);

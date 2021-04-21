@@ -9,7 +9,6 @@
 #	include <ModS/Typename.hpp>
 #	include <Signal.hpp>
 #	include <memory>
-#	include <iostream>
 
 namespace ModS {
 class AbstractModule {
@@ -28,7 +27,6 @@ protected:
 
 	template<typename T>
 	std::shared_ptr<T> shared() {
-		std::clog << "Getting shared: " << pretty_name<T>() << std::endl;
 		return std::static_pointer_cast<T>(injector->shared(pretty_name<T>()));
 	}
 

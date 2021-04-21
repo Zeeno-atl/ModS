@@ -70,7 +70,7 @@ Injector::~Injector() {
 	p->routes.clear();
 	p->interfaces.clear();
 	p->implementations.clear();
-	
+
 	p.reset();
 }
 
@@ -141,9 +141,10 @@ std::shared_ptr<void> Injector::shared(const std::string_view name) {
 		return p->shareds.at(sname);
 	}
 
-	std::shared_ptr<AbstractImplementationInfo> impl = route(name);
+	auto [impl, route] = resolve(name);
 	if (impl->isFactoryType()) {
-		return impl->create();
+		const std::shared_ptr<void> implPtr = impl->create();
+		return route->forwardCast(implPtr);
 	}
 
 	const auto uni    = unique(name);
@@ -152,10 +153,11 @@ std::shared_ptr<void> Injector::shared(const std::string_view name) {
 }
 
 Pointer Injector::unique(const std::string_view name) {
-	std::shared_ptr<AbstractImplementationInfo> impl = route(name);
+	auto [impl, route] = resolve(name);
 
 	p->creating.push_back(name);
-	const Pointer ptr = impl->create(this);
+	Pointer ptr = impl->create(this);
+	ptr.value = route->forwardCast(ptr.value);
 	p->creating.pop_back();
 	return ptr;
 }
@@ -211,35 +213,25 @@ void Injector::onRouteRegistered(const std::shared_ptr<AbstractRoute>& route) {
 	p->routes[route->priority()].emplace_back(route);
 }
 
-std::shared_ptr<AbstractImplementationInfo> Injector::route(const std::string_view iface) const {
-	std::string             resolved{iface};
-	std::deque<std::string> path;
-	path.emplace_back(resolved);
+std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> Injector::resolve(const std::string_view iface) const {
+	std::shared_ptr<AbstractRoute> resolved;
 
-	bool found = true;
-	while (found) {
-		found = false;
-		for (const auto& table : p->routes | std::views::values) {
-			if (auto it = std::ranges::find_if(
-				table,
-				[&resolved](const std::shared_ptr<AbstractRoute>& r) {
-					return r->interfaceName() == resolved;
-				}); it != table.end()) {
-				resolved = (*it)->implementationName();
-				if (std::ranges::find(path, resolved) != path.end()) {
-					throw RecursiveRouting("There is a recursive routing for interface '" + std::string(iface) + "'.");
-				}
-				path.emplace_back(resolved);
-				found = true;
-				break;
-			}
-		}
-
-		if (!found && !p->implementations.contains(resolved)) {
-			throw TypeMissing("Route ended at unregistered type '" + resolved + "'.");
+	for (const auto& table : p->routes | std::views::values) {
+		if (auto it = std::ranges::find_if(
+			table,
+			[&iface](const std::shared_ptr<AbstractRoute>& r) {
+				return r->interfaceName() == iface;
+			}); it != table.end()) {
+			resolved = *it;
+			break;
 		}
 	}
-	return p->implementations.at(resolved);
+
+	if (!resolved) {
+		throw TypeMissing("Route ended at unregistered type '" + std::string(iface) + "'.");
+	}
+
+	return {p->implementations.at(resolved->implementationName()), resolved};
 }
 
 } // namespace ModS

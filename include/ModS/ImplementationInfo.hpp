@@ -64,11 +64,13 @@ private:
 	}
 };
 
-template<typename Interface, typename Implementation>
+template<typename Implementation>
 class ImplementationFactory : public AbstractImplementationInfo {
 	using Factory = std::function<std::shared_ptr<Implementation>()>;
 	Factory factory;
 public:
+    using value_type = Implementation;
+	
 	ImplementationFactory(Factory factory)
 		: factory(factory) {
 	}
@@ -82,7 +84,7 @@ public:
 	}
 
 	std::string implementationName() const override {
-		return pretty_name<ImplementationFactory<Interface, Implementation>>();
+		return pretty_name<ImplementationFactory<Implementation>>();
 	}
 
 	std::vector<std::string> dependencies() const override {
