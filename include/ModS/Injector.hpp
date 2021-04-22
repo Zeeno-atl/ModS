@@ -4,7 +4,7 @@
 
 #	include <ModS/Module.hpp>
 #	include <ModS/Typename.hpp>
-#	include <Signal.hpp>
+#	include <Signal/Signal.hpp>
 #	include <concepts>
 #	include <filesystem>
 #	include <stdexcept>
@@ -13,6 +13,11 @@
 namespace ModS {
 
 class TypeMissing : public std::runtime_error {
+public:
+	using runtime_error::runtime_error;
+};
+
+class RouteMissing : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
 };
@@ -59,11 +64,17 @@ public:
 	}
 
 	template<typename T>
+	[[nodiscard]] std::shared_ptr<T> shared(const std::string_view implementation) {
+		return std::static_pointer_cast<T>(shared(pretty_name<T>(), implementation));
+	}
+
+	template<typename T>
 	[[nodiscard]] Pointer unique() {
 		return unique(pretty_name<T>());
 	}
 
 	[[nodiscard]] std::shared_ptr<void> shared(const std::string_view typeName) override;
+	[[nodiscard]] std::shared_ptr<void> shared(const std::string_view typeName, const std::string_view implementation);
 	[[nodiscard]] Pointer               unique(const std::string_view typeName) override;
 
 	template<typename Interface, typename Implementation = Interface>
@@ -137,6 +148,9 @@ public:
 	Zeeno::Signal<std::shared_ptr<AbstractRoute>>              signalRouteRegistered;
 
 	std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> resolve(const std::string_view iface) const;
+	std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> resolve(
+		const std::string_view iface,
+		const std::string_view implementation) const;
 
 protected:
 	void onImplementationRegistered(const std::shared_ptr<AbstractImplementationInfo>&);

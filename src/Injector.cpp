@@ -19,7 +19,7 @@ public:
 	std::unordered_map<std::string, std::shared_ptr<void>>                              shareds;
 	std::unordered_map<std::string, std::shared_ptr<AbstractInterfaceInfo>>             interfaces;
 	std::unordered_map<std::string, std::shared_ptr<AbstractImplementationInfo>>        implementations;
-	std::deque<std::string_view>                                                        creating;
+	std::deque<std::string>                                                             creating;
 	std::vector<std::shared_ptr<Zeeno::Connection>>                                     connections;
 	std::map<std::filesystem::path, boost::dll::shared_library>                         modules;
 
@@ -137,27 +137,70 @@ void Injector::clearShareds() {
 
 std::shared_ptr<void> Injector::shared(const std::string_view name) {
 	const std::string sname{name};
+	//If it matches, then it is a implementation, no need to cast
 	if (p->shareds.contains(sname)) {
 		return p->shareds.at(sname);
 	}
 
+	//Find route and serve factory
 	auto [impl, route] = resolve(name);
 	if (impl->isFactoryType()) {
 		const std::shared_ptr<void> implPtr = impl->create();
 		return route->forwardCast(implPtr);
 	}
 
-	const auto uni    = unique(name);
-	p->shareds[sname] = uni.toSharedPtr<void>();
-	return p->shareds[sname];
+	//If we match the implementation name, but not the interface name, cast to interface needs to be done
+	if (p->shareds.contains(route->implementationName())) {
+		const auto ptr = p->shareds.at(route->implementationName());
+		return route->forwardCast(ptr);
+	}
+
+	//If there is no instance whatsoever, create one and return interface casted pointer
+	p->creating.push_back(route->implementationName());
+	Pointer ptr = impl->create(this);
+	p->creating.pop_back();
+
+	p->shareds[route->implementationName()] = ptr.toSharedPtr<void>();
+
+	return route->forwardCast(p->shareds[route->implementationName()]);
+}
+
+std::shared_ptr<void> Injector::shared(const std::string_view iface, const std::string_view implementation) {
+    //TODO: when you put implementation directly
+	
+    // When we want to create IFoo as a IBar interface, we first need to resolve IFoo as Foo
+    const auto [resolvedImpl, implRoute] = resolve(implementation);
+	// and then find Foo -> IBar route
+	const auto [impl, route] = resolve(iface, resolvedImpl->implementationName());
+        
+	//Serve factory
+	if (impl->isFactoryType()) {
+		const std::shared_ptr<void> implPtr = impl->create();
+		return route->forwardCast(implPtr);
+	}
+
+	//if this type already exists
+	if (p->shareds.contains(route->implementationName())) {
+		const auto ptr = p->shareds.at(route->implementationName());
+		return route->forwardCast(ptr);
+	}
+        
+	//If there is no instance whatsoever, create one and return interface casted pointer
+	p->creating.push_back(route->implementationName());
+	Pointer ptr = impl->create(this);
+	p->creating.pop_back();
+
+	p->shareds[route->implementationName()] = ptr.toSharedPtr<void>();
+
+	return route->forwardCast(p->shareds[route->implementationName()]);
 }
 
 Pointer Injector::unique(const std::string_view name) {
 	auto [impl, route] = resolve(name);
 
-	p->creating.push_back(name);
+	p->creating.push_back(std::string(name));
 	Pointer ptr = impl->create(this);
-	ptr.value = route->forwardCast(ptr.value);
+	ptr.value   = route->forwardCast(ptr.value);
 	p->creating.pop_back();
 	return ptr;
 }
@@ -229,6 +272,29 @@ std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractR
 
 	if (!resolved) {
 		throw TypeMissing("Route ended at unregistered type '" + std::string(iface) + "'.");
+	}
+
+	return {p->implementations.at(resolved->implementationName()), resolved};
+}
+
+std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> Injector::resolve(
+	const std::string_view iface,
+	const std::string_view implementation) const {
+	std::shared_ptr<AbstractRoute> resolved;
+
+	for (const auto& table : p->routes | std::views::values) {
+		if (auto it = std::ranges::find_if(
+			table,
+			[&iface, &implementation](const std::shared_ptr<AbstractRoute>& r) {
+				return r->interfaceName() == iface && r->implementationName() == implementation;
+			}); it != table.end()) {
+			resolved = *it;
+			break;
+		}
+	}
+
+	if (!resolved) {
+		throw RouteMissing("Could not find route '" + std::string(implementation) + " -> " + std::string(iface) + "'.");
 	}
 
 	return {p->implementations.at(resolved->implementationName()), resolved};
