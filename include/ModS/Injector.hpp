@@ -16,10 +16,17 @@ class TypeMissing : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
 };
+
+class RouteMissing : public std::runtime_error {
+public:
+	using runtime_error::runtime_error;
+};
+
 class RecursiveDependency : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
 };
+
 class RecursiveRouting : public std::runtime_error {
 public:
 	using runtime_error::runtime_error;
@@ -31,6 +38,7 @@ class Injector : public AbstractInjector {
 
 public:
 	Injector();
+	~Injector() override;
 
 	bool addDynamicObject(std::filesystem::path);
 
@@ -48,21 +56,29 @@ public:
 	void stopService(std::filesystem::path filepath);
 	void stopService();
 
+	void clearShareds();
+
 	template<typename T>
 	[[nodiscard]] std::shared_ptr<T> shared() {
 		return std::static_pointer_cast<T>(shared(pretty_name<T>()));
 	}
 
 	template<typename T>
-	[[nodiscard]] Pointer unique() {
+	[[nodiscard]] std::shared_ptr<T> shared(const std::string_view implementation) {
+		return std::static_pointer_cast<T>(shared(pretty_name<T>(), implementation));
+	}
+
+	template<typename T>
+	[[nodiscard]] std::shared_ptr<T> unique() {
 		return unique(pretty_name<T>());
 	}
 
 	[[nodiscard]] std::shared_ptr<void> shared(const std::string_view typeName) override;
-	[[nodiscard]] Pointer               unique(const std::string_view typeName) override;
+	[[nodiscard]] std::shared_ptr<void> shared(const std::string_view typeName, const std::string_view implementation);
+	[[nodiscard]] std::shared_ptr<void> unique(const std::string_view typeName) override;
 
 	template<typename Interface, typename Implementation = Interface>
-	void bind() {
+	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> bind() {
 		publishInterface<Interface>();
 		publishImplementation<Implementation>();
 		routeInterfaces<Implementation, Interface>();
@@ -78,19 +94,33 @@ public:
 		auto dummy = {publishImplementation<Implementations>()...};
 	}
 
+	template<typename Interface, typename Implementation>
+	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> routeToFactory(
+	    std::function<std::shared_ptr<Implementation>()> factory, std::int32_t priority = 1) {
+		signalInterfaceRegistered(std::make_shared<InterfaceInfo<Interface>>());
+		signalImplementationRegistered(std::make_shared<ImplementationFactory<Implementation>>(factory));
+		signalRouteRegistered(std::make_shared<FactoryRoute<Interface, Implementation>>(priority));
+	}
+
 	template<typename Implementation>
 	void routeInterfaces() {
 	}
 
 	template<typename Implementation, typename Interface, typename... Interfaces>
-	void routeInterfaces() {
+	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> routeInterfaces() {
 		using R = Route<Interface, Implementation>;
 		signalRouteRegistered(std::make_shared<R>());
 
 		routeInterfaces<Implementation, Interfaces...>();
 	}
 
-private:
+	inline void routeInterfaces(const std::string& implementation, const std::vector<std::string>& interfaces, std::int32_t priority = 1) {
+		for (const auto& iface : interfaces) {
+			auto [impl, route] = resolve(iface); //check if the route already exists (it is possible to cast)
+			signalRouteRegistered(std::make_shared<Route<std::nullptr_t, std::nullptr_t>>(route, iface, implementation, priority));
+		}
+	}
+
 	template<typename Interface>
 	bool publishInterface() {
 		std::shared_ptr<InterfaceInfo<Interface>> interface = std::make_shared<InterfaceInfo<Interface>>();
@@ -105,24 +135,25 @@ private:
 		return true;
 	}
 
-public:
 	static bool sharedObjectFilter(const std::filesystem::path& path);
 
-	std::vector<std::string>                         interfaces() const;
-	std::vector<std::string>                         implementations() const;
-	std::vector<std::string>                         implementationDependencies(const std::string_view implementation) const;
-	std::vector<std::pair<std::string, std::string>> routes() const;
+	std::vector<std::string>                                        interfaces() const override;
+	std::vector<std::string>                                        implementations() const override;
+	std::vector<std::string>                                        implementationDependencies(const std::string_view implementation) const override;
+	std::vector<std::tuple<std::string, std::string, std::int32_t>> routes() const override;
 
-protected:
 	Zeeno::Signal<std::shared_ptr<AbstractImplementationInfo>> signalImplementationRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractInterfaceInfo>>      signalInterfaceRegistered;
 	Zeeno::Signal<std::shared_ptr<AbstractRoute>>              signalRouteRegistered;
 
-	std::shared_ptr<AbstractImplementationInfo> route(const std::string_view iface) const;
+	std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> resolve(const std::string_view iface) const;
+	std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> resolve(
+	    const std::string_view iface, const std::string_view implementation) const;
 
-	void onImplementationRegistered(std::shared_ptr<AbstractImplementationInfo>);
-	void onInterfaceRegistered(std::shared_ptr<AbstractInterfaceInfo>);
-	void onRouteRegistered(std::shared_ptr<AbstractRoute>);
+protected:
+	void onImplementationRegistered(const std::shared_ptr<AbstractImplementationInfo>&);
+	void onInterfaceRegistered(const std::shared_ptr<AbstractInterfaceInfo>&);
+	void onRouteRegistered(const std::shared_ptr<AbstractRoute>&);
 };
 
 } // namespace ModS

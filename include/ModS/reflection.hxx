@@ -2,12 +2,26 @@
 #ifndef REFLECTION_HXX__
 #	define REFLECTION_HXX__
 
+#	ifdef __llvm__
+
+#		include <string>
+#		include <tuple>
+
+namespace refl {
+template<typename T>
+std::tuple<int, double, std::string> as_tuple() {
+	return {};
+}
+} // namespace refl
+
+#	else
+
 /*
  * https://gist.github.com/deni64k/c5728d0596f8f1640318b357701f43e6
  */
 
-#	include <tuple>
-#	include <utility>
+#		include <tuple>
+#		include <utility>
 
 // Based on
 // * http://alexpolt.github.io/type-loophole.html
@@ -34,7 +48,7 @@ template<
     typename U,
     int  N,
     bool B,
-    typename = typename std::enable_if_t<!std::is_same_v<std::remove_cv_t<std::remove_reference_t<T>>, std::remove_cv_t<std::remove_reference_t<U>>>>>
+    typename = typename std::enable_if_t<!std::is_same_v<std::remove_cv_t<std::remove_reference_t<T> >, std::remove_cv_t<std::remove_reference_t<U> > > > >
 struct fn_def {
 	friend auto loophole(tag<T, N>) {
 		return U{};
@@ -95,14 +109,15 @@ template<typename T, typename U>
 struct loophole_tuple;
 
 template<typename T, int... Ns>
-struct loophole_tuple<T, std::integer_sequence<int, Ns...>> {
+struct loophole_tuple<T, std::integer_sequence<int, Ns...> > {
 	int dummy[sizeof...(Ns)] = {(sizeof(loophole(tag<T, Ns>{})), ...)};
 	using type               = std::tuple<decltype(loophole(tag<T, Ns>{}))...>;
 };
 
 template<typename T>
-using as_tuple = typename loophole_tuple<T, std::make_integer_sequence<int, fields_number_ctor<T>(0)>>::type;
+using as_tuple = typename loophole_tuple<T, std::make_integer_sequence<int, fields_number_ctor<T>(0)> >::type;
 
 } // namespace refl
+#	endif //LLVM
 
 #endif

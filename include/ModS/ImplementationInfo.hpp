@@ -10,15 +10,20 @@ namespace ModS {
 template<typename Implementation>
 class ImplementationInfo : public AbstractImplementationInfo {
 public:
-	Pointer create(AbstractInjector* inj) override {
+	std::shared_ptr<void> create(AbstractInjector* inj) override {
 		return construct(inj, refl::as_tuple<Implementation>());
 	}
 
 	std::string implementationName() const override {
 		return pretty_name<Implementation>();
 	}
+
 	std::vector<std::string> dependencies() const override {
 		return pretty_names(refl::as_tuple<Implementation>());
+	}
+
+	bool isFactoryType() const override {
+		return false;
 	}
 
 private:
@@ -40,15 +45,40 @@ private:
 	};
 
 	template<typename... Args>
-	static Pointer construct(AbstractInjector* inj, std::tuple<Args...>) {
-		Pointer p;
-		p.value   = new Implementation((Pull<Args>::pull(inj))...);
-		p.deleter = &destroy;
-		return p;
+	static std::shared_ptr<void> construct(AbstractInjector* inj, std::tuple<Args...>) {
+		std::shared_ptr<void> ptr;
+#	ifndef __llvm__
+		ptr = std::make_shared<Implementation>((Pull<Args>::pull(inj))...);
+#	endif
+		return ptr;
+	}
+};
+
+template<typename Implementation>
+class ImplementationFactory : public AbstractImplementationInfo {
+	using Factory = std::function<std::shared_ptr<Implementation>()>;
+	Factory factory;
+
+public:
+	using value_type = Implementation;
+
+	ImplementationFactory(Factory factory) : factory(factory) {
 	}
 
-	static void destroy(void* ptr) {
-		delete reinterpret_cast<Implementation*>(ptr);
+	std::shared_ptr<void> create(AbstractInjector* inj) override {
+		return factory();
+	}
+
+	std::string implementationName() const override {
+		return pretty_name<ImplementationFactory<Implementation>>();
+	}
+
+	std::vector<std::string> dependencies() const override {
+		return {};
+	}
+
+	bool isFactoryType() const override {
+		return true;
 	}
 };
 

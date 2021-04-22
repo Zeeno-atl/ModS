@@ -24,7 +24,7 @@
 #	define MODS_MODULE(TYPE) MODS_EXPORT std::shared_ptr<ModS::AbstractModule> MODS_INSTANCE_NAME = std::make_shared<TYPE>();
 
 namespace ModS {
-class Module : public AbstractModule {
+class MODS_EXPORT Module : public AbstractModule {
 protected:
 	template<typename Interface, typename Implementation = Interface>
 	void bind() {

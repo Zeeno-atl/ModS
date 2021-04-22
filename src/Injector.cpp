@@ -3,17 +3,25 @@
 #include <deque>
 #include <functional>
 #include <ranges>
+#include <utility>
 
 namespace ModS {
 
+struct RouteCompare {
+	bool operator()(const std::shared_ptr<AbstractRoute>& lhs, const std::shared_ptr<AbstractRoute>& rhs) const {
+		return lhs->priority() > rhs->priority();
+	}
+};
+
 class Injector::Private {
 public:
-	std::map<std::filesystem::path, boost::dll::shared_library>                  modules;
-	std::unordered_map<std::string, std::shared_ptr<AbstractImplementationInfo>> implementations;
-	std::unordered_map<std::string, std::shared_ptr<AbstractInterfaceInfo>>      interfaces;
-	std::unordered_map<std::string, std::shared_ptr<AbstractRoute>>              routes;
-	std::unordered_map<std::string, std::shared_ptr<void>>                       shareds;
-	std::deque<std::string_view>                                                 creating;
+	std::map<std::int32_t, std::vector<std::shared_ptr<AbstractRoute>>, std::greater<>> routes;
+	std::unordered_map<std::string, std::shared_ptr<void>>                              shareds;
+	std::unordered_map<std::string, std::shared_ptr<AbstractInterfaceInfo>>             interfaces;
+	std::unordered_map<std::string, std::shared_ptr<AbstractImplementationInfo>>        implementations;
+	std::deque<std::string>                                                             creating;
+	std::vector<std::shared_ptr<Zeeno::Connection>>                                     connections;
+	std::map<std::filesystem::path, boost::dll::shared_library>                         modules;
 
 	static std::string mangledFactoryName(const std::filesystem::path& path) {
 		std::vector<std::string> symbols                = boost::dll::library_info(path.c_str()).symbols();
@@ -23,15 +31,34 @@ public:
 		return getModuleFactorySymbol != symbols.end() ? std::string(*getModuleFactorySymbol) : "";
 	}
 
-	std::shared_ptr<AbstractModule> module(std::filesystem::path path) const {
+	std::shared_ptr<AbstractModule> module(const std::filesystem::path& path) const {
 		return modules.at(path).get<std::shared_ptr<AbstractModule>>(mangledFactoryName(path));
 	}
 };
 
 Injector::Injector() : p(std::make_shared<Private>()) {
-	signalImplementationRegistered.connect([this](std::shared_ptr<AbstractImplementationInfo> impl) { onImplementationRegistered(impl); });
-	signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { onInterfaceRegistered(iface); });
-	signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { onRouteRegistered(route); });
+	signalImplementationRegistered.connect([this](std::shared_ptr<AbstractImplementationInfo> impl) { onImplementationRegistered(std::move(impl)); });
+	signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { onInterfaceRegistered(std::move(iface)); });
+	signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { onRouteRegistered(std::move(route)); });
+}
+
+Injector::~Injector() {
+	//important to reset connections before Private is destroyed
+	signalImplementationRegistered.disconnectAll();
+	signalInterfaceRegistered.disconnectAll();
+	signalRouteRegistered.disconnectAll();
+
+	for (auto c : p->connections) {
+		c->disconnect();
+	}
+	p->connections.clear();
+
+	clearShareds();
+	p->routes.clear();
+	p->interfaces.clear();
+	p->implementations.clear();
+
+	p.reset();
 }
 
 bool Injector::addDynamicObject(std::filesystem::path filepath) {
@@ -50,9 +77,11 @@ bool Injector::addDynamicObject(std::filesystem::path filepath) {
 	p->modules[filepath] = std::move(library);
 	auto module          = p->module(filepath);
 	module->injector     = this;
-	module->signalImplementationRegistered.connect([this](std::shared_ptr<AbstractImplementationInfo> impl) { onImplementationRegistered(impl); });
-	module->signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { onInterfaceRegistered(iface); });
-	module->signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { onRouteRegistered(route); });
+	p->connections.push_back(module->signalImplementationRegistered.connect(
+	    [this](std::shared_ptr<AbstractImplementationInfo> impl) { signalImplementationRegistered(std::move(impl)); }));
+	p->connections.push_back(
+	    module->signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { signalInterfaceRegistered(std::move(iface)); }));
+	p->connections.push_back(module->signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { signalRouteRegistered(std::move(route)); }));
 	module->bindTypes();
 	return true;
 }
@@ -63,7 +92,7 @@ void Injector::startService(std::filesystem::path filepath) {
 }
 
 void Injector::startService() {
-	for (auto pair : p->modules) {
+	for (const auto pair : p->modules) {
 		startService(pair.first);
 	}
 }
@@ -74,27 +103,77 @@ void Injector::stopService(std::filesystem::path filepath) {
 }
 
 void Injector::stopService() {
-	for (auto pair : p->modules) {
+	for (const auto pair : p->modules) {
 		stopService(pair.first);
 	}
 }
 
+void Injector::clearShareds() {
+	p->shareds.clear();
+}
+
 std::shared_ptr<void> Injector::shared(const std::string_view name) {
-	std::string sname{name};
+	const std::string sname{name};
+	//If it matches, then it is a implementation, no need to cast
 	if (p->shareds.contains(sname)) {
 		return p->shareds.at(sname);
 	}
 
-	auto uni          = unique(name);
-	p->shareds[sname] = uni.toSharedPtr<void>();
-	return p->shareds[sname];
+	//Find route and serve factory
+	auto [impl, route] = resolve(name);
+	if (impl->isFactoryType()) {
+		const std::shared_ptr<void> implPtr = impl->create(nullptr);
+		return route->forwardCast(implPtr);
+	}
+
+	//If we match the implementation name, but not the interface name, cast to interface needs to be done
+	if (p->shareds.contains(route->implementationName())) {
+		const auto ptr = p->shareds.at(route->implementationName());
+		return route->forwardCast(ptr);
+	}
+
+	//If there is no instance whatsoever, create one and return interface casted pointer
+	p->creating.push_back(route->implementationName());
+	p->shareds[route->implementationName()] = impl->create(this);
+	p->creating.pop_back();
+
+	return route->forwardCast(p->shareds[route->implementationName()]);
 }
 
-Pointer Injector::unique(const std::string_view name) {
-	std::shared_ptr<AbstractImplementationInfo> impl = route(name);
+std::shared_ptr<void> Injector::shared(const std::string_view iface, const std::string_view implementation) {
+	//TODO: when you put implementation directly
 
-	p->creating.push_back(name);
-	Pointer ptr = impl->create(this);
+	// When we want to create IFoo as a IBar interface, we first need to resolve IFoo as Foo
+	const auto [resolvedImpl, implRoute] = resolve(implementation);
+	// and then find Foo -> IBar route
+	const auto [impl, route] = resolve(iface, resolvedImpl->implementationName());
+
+	//Serve factory
+	if (impl->isFactoryType()) {
+		const std::shared_ptr<void> implPtr = impl->create(nullptr);
+		return route->forwardCast(implPtr);
+	}
+
+	//if this type already exists
+	if (p->shareds.contains(route->implementationName())) {
+		const auto ptr = p->shareds.at(route->implementationName());
+		return route->forwardCast(ptr);
+	}
+
+	//If there is no instance whatsoever, create one and return interface casted pointer
+	p->creating.push_back(route->implementationName());
+	p->shareds[route->implementationName()] = impl->create(this);
+	p->creating.pop_back();
+
+	return route->forwardCast(p->shareds[route->implementationName()]);
+}
+
+std::shared_ptr<void> Injector::unique(const std::string_view name) {
+	auto [impl, route] = resolve(name);
+
+	p->creating.push_back(std::string(name));
+	auto ptr = impl->create(this);
+	ptr      = route->forwardCast(ptr);
 	p->creating.pop_back();
 	return ptr;
 }
@@ -108,59 +187,87 @@ bool Injector::sharedObjectFilter(const std::filesystem::path& path) {
 }
 
 std::vector<std::string> Injector::interfaces() const {
-	auto types = p->interfaces | std::views::keys | std::views::common;
+	const auto types = p->interfaces | std::views::keys | std::views::common;
 	return {types.begin(), types.end()};
 }
 
 std::vector<std::string> Injector::implementations() const {
-	auto types = p->implementations | std::views::keys | std::views::common;
+	const auto types = p->implementations | std::views::keys | std::views::common;
 	return {types.begin(), types.end()};
 }
 
-std::vector<std::pair<std::string, std::string>> Injector::routes() const {
-	auto rts = p->routes | std::views::values | std::views::transform([](std::shared_ptr<AbstractRoute> route) -> std::pair<std::string, std::string> {
-		           return std::make_pair(route->interfaceName(), route->implementationName());
+std::vector<std::tuple<std::string, std::string, std::int32_t>> Injector::routes() const {
+	/*auto rts = p->routes | std::views::values | std::views::join | std::views::transform([](std::shared_ptr<AbstractRoute> route) {
+		           return std::make_tuple(route->interfaceName(), route->implementationName(), route->priority());
 	           })
 	           | std::views::common;
-	return {rts.begin(), rts.end()};
+	return {rts.begin(), rts.end()};*/
+	std::vector<std::tuple<std::string, std::string, std::int32_t>> rts;
+
+	for (const auto& table : p->routes | std::views::values) {
+		for (const auto& r : table) {
+			rts.push_back(std::make_tuple(r->interfaceName(), r->implementationName(), r->priority()));
+		}
+	}
+
+	return rts;
 }
 
 std::vector<std::string> Injector::implementationDependencies(const std::string_view type) const {
 	return p->implementations.at(std::string(type))->dependencies();
 }
 
-void Injector::onImplementationRegistered(std::shared_ptr<AbstractImplementationInfo> impl) {
+void Injector::onImplementationRegistered(const std::shared_ptr<AbstractImplementationInfo>& impl) {
 	p->implementations[impl->implementationName()] = impl;
 }
 
-void Injector::onInterfaceRegistered(std::shared_ptr<AbstractInterfaceInfo> iface) {
+void Injector::onInterfaceRegistered(const std::shared_ptr<AbstractInterfaceInfo>& iface) {
 	p->interfaces[iface->interfaceName()] = iface;
 }
 
-void Injector::onRouteRegistered(std::shared_ptr<AbstractRoute> route) {
-	p->routes[route->interfaceName()] = route;
+void Injector::onRouteRegistered(const std::shared_ptr<AbstractRoute>& route) {
+	p->routes[route->priority()].emplace_back(route);
 }
 
-std::shared_ptr<AbstractImplementationInfo> Injector::route(const std::string_view iface) const {
-	std::string             resolved{iface};
-	std::deque<std::string> path;
-	path.emplace_back(resolved);
+std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> Injector::resolve(const std::string_view iface) const {
+	std::shared_ptr<AbstractRoute> resolved;
 
-	while (p->routes.contains(resolved)) {
-		resolved = p->routes.at(resolved)->implementationName();
-
-		if (std::find(path.cbegin(), path.cend(), resolved) != path.cend()) {
-			throw RecursiveRouting("There is a recursive routing for interface '" + std::string(iface) + "'.");
+	for (const auto& table : p->routes | std::views::values) {
+		if (auto it = std::ranges::find_if(table, [&iface](const std::shared_ptr<AbstractRoute>& r) { return r->interfaceName() == iface; });
+		    it != table.end()) {
+			resolved = *it;
+			break;
 		}
-
-		path.emplace_back(resolved);
 	}
 
-	if (!p->implementations.contains(resolved)) {
-		throw TypeMissing("Route ended at unregistered type '" + resolved + "'.");
+	if (!resolved) {
+		throw TypeMissing("Route ended at unregistered type '" + std::string(iface) + "'.");
 	}
 
-	return p->implementations.at(resolved);
+	return {p->implementations.at(resolved->implementationName()), resolved};
+}
+
+std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> Injector::resolve(
+    const std::string_view iface, const std::string_view implementation) const {
+	std::shared_ptr<AbstractRoute> resolved;
+
+	for (const auto& table : p->routes | std::views::values) {
+		if (auto it = std::ranges::find_if(
+		        table,
+		        [&iface, &implementation](const std::shared_ptr<AbstractRoute>& r) {
+			        return r->interfaceName() == iface && r->implementationName() == implementation;
+		        });
+		    it != table.end()) {
+			resolved = *it;
+			break;
+		}
+	}
+
+	if (!resolved) {
+		throw RouteMissing("Could not find route '" + std::string(implementation) + " -> " + std::string(iface) + "'.");
+	}
+
+	return {p->implementations.at(resolved->implementationName()), resolved};
 }
 
 } // namespace ModS

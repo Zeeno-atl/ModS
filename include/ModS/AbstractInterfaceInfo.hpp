@@ -2,9 +2,7 @@
 #ifndef _MODS_ABSTRACT_INTERFACE_INFO_HPP
 #	define _MODS_ABSTRACT_INTERFACE_INFO_HPP
 
-#	include <memory>
 #	include <string>
-#	include <vector>
 
 namespace ModS {
 class AbstractInterfaceInfo {
