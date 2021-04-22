@@ -27,11 +27,11 @@ protected:
 
 	template<typename T>
 	std::shared_ptr<T> shared() {
-		return std::static_pointer_cast<T>(injector->shared(pretty_name<T>()));
+		return injector->shared(pretty_name<T>());
 	}
 
 	template<typename T>
-	Pointer unique() {
+	std::shared_ptr<T> unique() {
 		return injector->unique(pretty_name<T>());
 	}
 

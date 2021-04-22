@@ -4,20 +4,17 @@
 
 #	include <ModS/AbstractImplementationInfo.hpp>
 #	include <ModS/reflection.hxx>
+#   include <ModS/EnableSharedFromThis.hpp>
 
 namespace ModS {
 
 template<typename Implementation>
 class ImplementationInfo : public AbstractImplementationInfo {
 public:
-	Pointer create(AbstractInjector* inj) override {
+	std::shared_ptr<void> create(AbstractInjector* inj) override {
 		return construct(inj, refl::as_tuple<Implementation>());
 	}
 	
-	std::shared_ptr<void> create() const override {
-		return nullptr;
-	}
-
 	std::string implementationName() const override {
 		return pretty_name<Implementation>();
 	}
@@ -50,18 +47,14 @@ private:
 	};
 
 	template<typename... Args>
-	static Pointer construct(AbstractInjector* inj, std::tuple<Args...>) {
-		Pointer p;
+	static std::shared_ptr<void> construct(AbstractInjector* inj, std::tuple<Args...>) {
+		std::shared_ptr<void> ptr;
 #	ifndef __llvm__
-		p.value = new Implementation((Pull<Args>::pull(inj))...);
+		ptr = std::make_shared<Implementation>((Pull<Args>::pull(inj))...);
 #	endif
-		p.deleter = &destroy;
-		return p;
+		return ptr;
 	}
-
-	static void destroy(void* ptr) {
-		delete static_cast<Implementation*>(ptr);
-	}
+        
 };
 
 template<typename Implementation>
@@ -75,12 +68,8 @@ public:
 		: factory(factory) {
 	}
 
-	std::shared_ptr<void> create() const override {
+	std::shared_ptr<void> create(AbstractInjector* inj) override {
 		return factory();
-	}
-
-	Pointer create(AbstractInjector* inj) override {
-		return {};
 	}
 
 	std::string implementationName() const override {

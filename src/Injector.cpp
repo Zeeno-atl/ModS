@@ -145,7 +145,7 @@ std::shared_ptr<void> Injector::shared(const std::string_view name) {
 	//Find route and serve factory
 	auto [impl, route] = resolve(name);
 	if (impl->isFactoryType()) {
-		const std::shared_ptr<void> implPtr = impl->create();
+		const std::shared_ptr<void> implPtr = impl->create(nullptr);
 		return route->forwardCast(implPtr);
 	}
 
@@ -157,25 +157,23 @@ std::shared_ptr<void> Injector::shared(const std::string_view name) {
 
 	//If there is no instance whatsoever, create one and return interface casted pointer
 	p->creating.push_back(route->implementationName());
-	Pointer ptr = impl->create(this);
+	p->shareds[route->implementationName()] = impl->create(this);
 	p->creating.pop_back();
-
-	p->shareds[route->implementationName()] = ptr.toSharedPtr<void>();
 
 	return route->forwardCast(p->shareds[route->implementationName()]);
 }
 
 std::shared_ptr<void> Injector::shared(const std::string_view iface, const std::string_view implementation) {
-    //TODO: when you put implementation directly
-	
-    // When we want to create IFoo as a IBar interface, we first need to resolve IFoo as Foo
-    const auto [resolvedImpl, implRoute] = resolve(implementation);
+	//TODO: when you put implementation directly
+
+	// When we want to create IFoo as a IBar interface, we first need to resolve IFoo as Foo
+	const auto [resolvedImpl, implRoute] = resolve(implementation);
 	// and then find Foo -> IBar route
 	const auto [impl, route] = resolve(iface, resolvedImpl->implementationName());
-        
+
 	//Serve factory
 	if (impl->isFactoryType()) {
-		const std::shared_ptr<void> implPtr = impl->create();
+		const std::shared_ptr<void> implPtr = impl->create(nullptr);
 		return route->forwardCast(implPtr);
 	}
 
@@ -184,23 +182,21 @@ std::shared_ptr<void> Injector::shared(const std::string_view iface, const std::
 		const auto ptr = p->shareds.at(route->implementationName());
 		return route->forwardCast(ptr);
 	}
-        
+
 	//If there is no instance whatsoever, create one and return interface casted pointer
 	p->creating.push_back(route->implementationName());
-	Pointer ptr = impl->create(this);
+	p->shareds[route->implementationName()] = impl->create(this);
 	p->creating.pop_back();
-
-	p->shareds[route->implementationName()] = ptr.toSharedPtr<void>();
 
 	return route->forwardCast(p->shareds[route->implementationName()]);
 }
 
-Pointer Injector::unique(const std::string_view name) {
+std::shared_ptr<void> Injector::unique(const std::string_view name) {
 	auto [impl, route] = resolve(name);
 
 	p->creating.push_back(std::string(name));
-	Pointer ptr = impl->create(this);
-	ptr.value   = route->forwardCast(ptr.value);
+	auto ptr = impl->create(this);
+	ptr      = route->forwardCast(ptr);
 	p->creating.pop_back();
 	return ptr;
 }

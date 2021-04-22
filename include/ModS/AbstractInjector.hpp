@@ -2,7 +2,6 @@
 #ifndef _MODS_ABSTRACTINJECTOR_H
 #	define _MODS_ABSTRACTINJECTOR_H
 
-#	include <ModS/Pointer.hpp>
 #	include <memory>
 #	include <string>
 #	include <vector>
@@ -13,7 +12,7 @@ public:
     virtual ~AbstractInjector() = default;
 	
 	[[nodiscard]] virtual std::shared_ptr<void> shared(const std::string_view typeName) = 0;
-	[[nodiscard]] virtual Pointer               unique(const std::string_view typeName) = 0;
+	[[nodiscard]] virtual std::shared_ptr<void> unique(const std::string_view typeName) = 0;
 
 	virtual std::vector<std::string>                         interfaces() const                                                      = 0;
 	virtual std::vector<std::string>                         implementations() const                                                 = 0;

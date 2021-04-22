@@ -69,13 +69,13 @@ public:
 	}
 
 	template<typename T>
-	[[nodiscard]] Pointer unique() {
+	[[nodiscard]] std::shared_ptr<T> unique() {
 		return unique(pretty_name<T>());
 	}
 
 	[[nodiscard]] std::shared_ptr<void> shared(const std::string_view typeName) override;
 	[[nodiscard]] std::shared_ptr<void> shared(const std::string_view typeName, const std::string_view implementation);
-	[[nodiscard]] Pointer               unique(const std::string_view typeName) override;
+	[[nodiscard]] std::shared_ptr<void> unique(const std::string_view typeName) override;
 
 	template<typename Interface, typename Implementation = Interface>
 	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> bind() {
