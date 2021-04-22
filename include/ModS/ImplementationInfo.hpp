@@ -13,7 +13,7 @@ public:
 	std::shared_ptr<void> create(AbstractInjector* inj) override {
 		return construct(inj, refl::as_tuple<Implementation>());
 	}
-	
+
 	std::string implementationName() const override {
 		return pretty_name<Implementation>();
 	}
@@ -21,15 +21,14 @@ public:
 	std::vector<std::string> dependencies() const override {
 		return pretty_names(refl::as_tuple<Implementation>());
 	}
-        
+
 	bool isFactoryType() const override {
 		return false;
 	}
 
 private:
 	template<typename X>
-	struct Pull {
-	};
+	struct Pull {};
 
 	template<typename X>
 	struct Pull<std::shared_ptr<X>> {
@@ -53,18 +52,17 @@ private:
 #	endif
 		return ptr;
 	}
-        
 };
 
 template<typename Implementation>
 class ImplementationFactory : public AbstractImplementationInfo {
 	using Factory = std::function<std::shared_ptr<Implementation>()>;
 	Factory factory;
+
 public:
-    using value_type = Implementation;
-	
-	ImplementationFactory(Factory factory)
-		: factory(factory) {
+	using value_type = Implementation;
+
+	ImplementationFactory(Factory factory) : factory(factory) {
 	}
 
 	std::shared_ptr<void> create(AbstractInjector* inj) override {
@@ -78,7 +76,7 @@ public:
 	std::vector<std::string> dependencies() const override {
 		return {};
 	}
-	
+
 	bool isFactoryType() const override {
 		return true;
 	}

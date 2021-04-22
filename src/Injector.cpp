@@ -25,12 +25,9 @@ public:
 
 	static std::string mangledFactoryName(const std::filesystem::path& path) {
 		std::vector<std::string> symbols                = boost::dll::library_info(path.c_str()).symbols();
-		const auto               getModuleFactorySymbol = std::find_if(
-			symbols.cbegin(),
-			symbols.cend(),
-			[](const std::string& symbol) {
-				return symbol.find(MODS_INSTANCE_NAME_STRING) != std::string::npos;
-			});
+		const auto               getModuleFactorySymbol = std::find_if(symbols.cbegin(), symbols.cend(), [](const std::string& symbol) {
+            return symbol.find(MODS_INSTANCE_NAME_STRING) != std::string::npos;
+        });
 		return getModuleFactorySymbol != symbols.end() ? std::string(*getModuleFactorySymbol) : "";
 	}
 
@@ -39,20 +36,10 @@ public:
 	}
 };
 
-Injector::Injector()
-	: p(std::make_shared<Private>()) {
-	signalImplementationRegistered.connect(
-		[this](std::shared_ptr<AbstractImplementationInfo> impl) {
-			onImplementationRegistered(std::move(impl));
-		});
-	signalInterfaceRegistered.connect(
-		[this](std::shared_ptr<AbstractInterfaceInfo> iface) {
-			onInterfaceRegistered(std::move(iface));
-		});
-	signalRouteRegistered.connect(
-		[this](std::shared_ptr<AbstractRoute> route) {
-			onRouteRegistered(std::move(route));
-		});
+Injector::Injector() : p(std::make_shared<Private>()) {
+	signalImplementationRegistered.connect([this](std::shared_ptr<AbstractImplementationInfo> impl) { onImplementationRegistered(std::move(impl)); });
+	signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { onInterfaceRegistered(std::move(iface)); });
+	signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { onRouteRegistered(std::move(route)); });
 }
 
 Injector::~Injector() {
@@ -90,21 +77,11 @@ bool Injector::addDynamicObject(std::filesystem::path filepath) {
 	p->modules[filepath] = std::move(library);
 	auto module          = p->module(filepath);
 	module->injector     = this;
+	p->connections.push_back(module->signalImplementationRegistered.connect(
+	    [this](std::shared_ptr<AbstractImplementationInfo> impl) { signalImplementationRegistered(std::move(impl)); }));
 	p->connections.push_back(
-		module->signalImplementationRegistered.connect(
-			[this](std::shared_ptr<AbstractImplementationInfo> impl) {
-				signalImplementationRegistered(std::move(impl));
-			}));
-	p->connections.push_back(
-		module->signalInterfaceRegistered.connect(
-			[this](std::shared_ptr<AbstractInterfaceInfo> iface) {
-				signalInterfaceRegistered(std::move(iface));
-			}));
-	p->connections.push_back(
-		module->signalRouteRegistered.connect(
-			[this](std::shared_ptr<AbstractRoute> route) {
-				signalRouteRegistered(std::move(route));
-			}));
+	    module->signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { signalInterfaceRegistered(std::move(iface)); }));
+	p->connections.push_back(module->signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { signalRouteRegistered(std::move(route)); }));
 	module->bindTypes();
 	return true;
 }
@@ -256,11 +233,8 @@ std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractR
 	std::shared_ptr<AbstractRoute> resolved;
 
 	for (const auto& table : p->routes | std::views::values) {
-		if (auto it = std::ranges::find_if(
-			table,
-			[&iface](const std::shared_ptr<AbstractRoute>& r) {
-				return r->interfaceName() == iface;
-			}); it != table.end()) {
+		if (auto it = std::ranges::find_if(table, [&iface](const std::shared_ptr<AbstractRoute>& r) { return r->interfaceName() == iface; });
+		    it != table.end()) {
 			resolved = *it;
 			break;
 		}
@@ -274,16 +248,16 @@ std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractR
 }
 
 std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> Injector::resolve(
-	const std::string_view iface,
-	const std::string_view implementation) const {
+    const std::string_view iface, const std::string_view implementation) const {
 	std::shared_ptr<AbstractRoute> resolved;
 
 	for (const auto& table : p->routes | std::views::values) {
 		if (auto it = std::ranges::find_if(
-			table,
-			[&iface, &implementation](const std::shared_ptr<AbstractRoute>& r) {
-				return r->interfaceName() == iface && r->implementationName() == implementation;
-			}); it != table.end()) {
+		        table,
+		        [&iface, &implementation](const std::shared_ptr<AbstractRoute>& r) {
+			        return r->interfaceName() == iface && r->implementationName() == implementation;
+		        });
+		    it != table.end()) {
 			resolved = *it;
 			break;
 		}

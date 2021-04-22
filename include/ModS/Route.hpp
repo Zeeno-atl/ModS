@@ -11,9 +11,9 @@ namespace ModS {
 template<typename Interface, typename Implementation>
 class Route : public AbstractRoute {
 	std::int32_t _priority{};
+
 public:
-	Route(std::int32_t priority = 0)
-		: _priority(priority) {
+	Route(std::int32_t priority = 0) : _priority(priority) {
 	}
 
 	std::string implementationName() const override {
@@ -41,9 +41,9 @@ public:
 template<typename Interface, typename Implementation>
 class FactoryRoute : public AbstractRoute {
 	std::int32_t _priority{};
+
 public:
-	FactoryRoute(std::int32_t priority = 10)
-		: _priority(priority) {
+	FactoryRoute(std::int32_t priority = 10) : _priority(priority) {
 	}
 
 	std::string implementationName() const override {
@@ -74,9 +74,10 @@ class Route<std::nullptr_t, std::nullptr_t> : public AbstractRoute {
 	std::string                    implementation;
 	std::int32_t                   _priority{};
 	std::shared_ptr<AbstractRoute> castable;
+
 public:
 	Route(std::shared_ptr<AbstractRoute> castable, std::string interface, std::string implementation, std::int32_t priority = 0)
-		: interface(std::move(interface)), implementation(std::move(implementation)), _priority(priority), castable(std::move(castable)) {
+	    : interface(std::move(interface)), implementation(std::move(implementation)), _priority(priority), castable(std::move(castable)) {
 	}
 
 	std::string implementationName() const override {

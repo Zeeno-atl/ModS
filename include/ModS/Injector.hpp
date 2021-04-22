@@ -96,8 +96,7 @@ public:
 
 	template<typename Interface, typename Implementation>
 	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> routeToFactory(
-		std::function<std::shared_ptr<Implementation>()> factory,
-		std::int32_t                                     priority = 1) {
+	    std::function<std::shared_ptr<Implementation>()> factory, std::int32_t priority = 1) {
 		signalInterfaceRegistered(std::make_shared<InterfaceInfo<Interface>>());
 		signalImplementationRegistered(std::make_shared<ImplementationFactory<Implementation>>(factory));
 		signalRouteRegistered(std::make_shared<FactoryRoute<Interface, Implementation>>(priority));
@@ -149,8 +148,7 @@ public:
 
 	std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> resolve(const std::string_view iface) const;
 	std::pair<std::shared_ptr<AbstractImplementationInfo>, std::shared_ptr<AbstractRoute>> resolve(
-		const std::string_view iface,
-		const std::string_view implementation) const;
+	    const std::string_view iface, const std::string_view implementation) const;
 
 protected:
 	void onImplementationRegistered(const std::shared_ptr<AbstractImplementationInfo>&);

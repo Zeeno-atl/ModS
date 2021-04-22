@@ -22,7 +22,7 @@ inline std::string extractTypeFromSharedPtr(const std::string_view type) {
 		return std::string(type);
 	}
 	const size_t suffixLen = anchorPtrString.length() - prefixLen - anchorString.length();
-	const size_t typeLen = type.length() - prefixLen - suffixLen;
+	const size_t typeLen   = type.length() - prefixLen - suffixLen;
 	return std::string(type.substr(prefixLen, typeLen));
 }
 
@@ -62,8 +62,8 @@ inline std::ostream& operator<<(std::ostream& os, AbstractInjector& injector) {
 	}
 
 	for (const auto& [iface, impl, priority] : injector.routes()) {
-		os << "\t\"" << impl << "\" -> \"" << interfaceLabel(iface) << "\" [arrowhead = onormal, style = dashed, label = \"p = " << priority << "\"];" <<
-			std::endl;
+		os << "\t\"" << impl << "\" -> \"" << interfaceLabel(iface) << "\" [arrowhead = onormal, style = dashed, label = \"p = " << priority << "\"];"
+		   << std::endl;
 	}
 
 	os << "}";
