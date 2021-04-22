@@ -4,7 +4,6 @@
 
 #	include <ModS/AbstractImplementationInfo.hpp>
 #	include <ModS/reflection.hxx>
-#   include <ModS/EnableSharedFromThis.hpp>
 
 namespace ModS {
 
