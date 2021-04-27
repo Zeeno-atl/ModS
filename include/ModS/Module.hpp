@@ -44,15 +44,24 @@ protected:
 	}
 
 	template<typename Implementation>
-	void routeInterfaces() {
+	void routeInterfaces(int priority = 0) {
 	}
 
 	template<typename Implementation, typename Interface, typename... Interfaces>
-	void routeInterfaces() {
+	void routeInterfaces(int priority = 0) {
 		using R = Route<Interface, Implementation>;
-		signalRouteRegistered(std::make_shared<R>());
+		signalRouteRegistered(std::make_shared<R>(priority));
 
-		routeInterfaces<Implementation, Interfaces...>();
+		routeInterfaces<Implementation, Interfaces...>(priority);
+	}
+
+	template<typename Interface, typename Implementation>
+	std::enable_if_t<std::is_base_of_v<Interface, Implementation>> routeToFactory(
+		std::function<std::shared_ptr<Implementation>()> factory,
+		std::int32_t                                     priority = 1) {
+		signalInterfaceRegistered(std::make_shared<InterfaceInfo<Interface>>());
+		signalImplementationRegistered(std::make_shared<ImplementationFactory<Implementation>>(factory));
+		signalRouteRegistered(std::make_shared<FactoryRoute<Interface, Implementation>>(priority));
 	}
 
 private:

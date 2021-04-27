@@ -4,6 +4,7 @@
 #include <functional>
 #include <ranges>
 #include <utility>
+#include <numeric>
 
 namespace ModS {
 
@@ -65,6 +66,7 @@ bool Injector::addDynamicObject(std::filesystem::path filepath) {
 	filepath = std::filesystem::canonical(filepath);
 	using namespace boost::dll;
 	shared_library library;
+	
 	library.load(filepath.string(), load_mode::load_with_altered_search_path | load_mode::rtld_lazy | load_mode::rtld_local);
 
 	if (!library.is_loaded())
@@ -133,6 +135,10 @@ std::shared_ptr<void> Injector::shared(const std::string_view name) {
 	}
 
 	//If there is no instance whatsoever, create one and return interface casted pointer
+	if(std::ranges::find(p->creating, route->implementationName()) != p->creating.end()) {
+        std::string path = std::accumulate(p->creating.begin(), p->creating.end(), std::string{}, [](const std::string &a, const std::string& b){ return a + " -> " + b;});
+		throw RecursiveDependency("Recursive dependency: " + path + " -> " + route->implementationName());
+	}
 	p->creating.push_back(route->implementationName());
 	p->shareds[route->implementationName()] = impl->create(this);
 	p->creating.pop_back();
@@ -161,6 +167,10 @@ std::shared_ptr<void> Injector::shared(const std::string_view iface, const std::
 	}
 
 	//If there is no instance whatsoever, create one and return interface casted pointer
+	if(std::ranges::find(p->creating, route->implementationName()) != p->creating.end()) {
+        std::string path = std::accumulate(p->creating.begin(), p->creating.end(), std::string{}, [](const std::string &a, const std::string& b){ return a + " -> " + b;});
+		throw RecursiveDependency("Recursive dependency: " + path + " -> " + route->implementationName());
+	}
 	p->creating.push_back(route->implementationName());
 	p->shareds[route->implementationName()] = impl->create(this);
 	p->creating.pop_back();
