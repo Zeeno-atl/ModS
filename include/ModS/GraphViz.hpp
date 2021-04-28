@@ -62,7 +62,7 @@ inline std::ostream& operator<<(std::ostream& os, AbstractInjector& injector) {
 	}
 
 	for (const auto& [iface, impl, priority] : injector.routes()) {
-		os << "\t\"" << impl << "\" -> \"" << interfaceLabel(iface) << "\" [arrowhead = onormal, style = dashed, label = \"p = " << priority << "\"];"
+		os << "\t\"" << interfaceLabel(iface) << "\" -> \"" << impl << "\" [arrowhead = onormal, style = dashed, label = \"p = " << priority << "\"];"
 		   << std::endl;
 	}
 
