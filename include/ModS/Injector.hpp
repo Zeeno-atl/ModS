@@ -3,6 +3,7 @@
 #	define _MODS_INJECTOR_HPP
 
 #	include <ModS/Module.hpp>
+#	include <ModS/AbstractInjector.hpp>
 #	include <ModS/Typename.hpp>
 #	include <Signal/Signal.hpp>
 #	include <concepts>

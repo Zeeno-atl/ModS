@@ -3,6 +3,7 @@
 #	define _MODS_GRAPH_VIZ_HPP
 
 #	include <ModS/AbstractInjector.hpp>
+#	include <ModS/Typename.hpp>
 #	include <ostream>
 #	include <regex>
 
