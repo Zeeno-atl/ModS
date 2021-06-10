@@ -13,14 +13,6 @@
 #		define MODS_INSTANCE_NAME_STRING "makeModSModule"
 #	endif
 
-#	ifndef MODS_EXPORT
-#		ifdef _MSC_VER
-#			define MODS_EXPORT __declspec(dllexport)
-#		else
-#			define MODS_EXPORT __attribute__((visibility("default")))
-#		endif
-#	endif
-
 #	define MODS_MODULE(TYPE) MODS_EXPORT std::shared_ptr<ModS::AbstractModule> MODS_INSTANCE_NAME = std::make_shared<TYPE>();
 
 namespace ModS {
@@ -44,7 +36,7 @@ protected:
 	}
 
 	template<typename Implementation>
-	void routeInterfaces(int priority = 0) {
+	void routeInterfaces(int /* priority */ = 0) {
 	}
 
 	template<typename Implementation, typename Interface, typename... Interfaces>

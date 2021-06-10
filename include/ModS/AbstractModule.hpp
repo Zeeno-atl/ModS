@@ -10,8 +10,16 @@
 #	include <Signal/Signal.hpp>
 #	include <memory>
 
+#	ifndef MODS_EXPORT
+#		ifdef _MSC_VER
+#			define MODS_EXPORT __declspec(dllexport)
+#		else
+#			define MODS_EXPORT __attribute__((visibility("default")))
+#		endif
+#	endif
+
 namespace ModS {
-class AbstractModule {
+class MODS_EXPORT AbstractModule {
 	friend class Injector;
 
 protected:

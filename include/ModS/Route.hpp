@@ -9,6 +9,7 @@
 namespace ModS {
 
 template<typename Interface, typename Implementation>
+requires std::is_convertible_v<Implementation*, Interface*>
 class Route : public AbstractRoute {
 	std::int32_t _priority{};
 
@@ -96,8 +97,8 @@ public:
 		return castable->forwardCast(ptr);
 	}
 
-	void* forwardCast(void* implementation) const override {
-		return castable->forwardCast(implementation);
+	void* forwardCast(void* impl) const override {
+		return castable->forwardCast(impl);
 	}
 };
 
