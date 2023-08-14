@@ -5,7 +5,9 @@
 #	include <ModS/AbstractInjector.hpp>
 #	include <ModS/Typename.hpp>
 #	include <ostream>
+#	include <ranges>
 #	include <regex>
+#	include <string_view>
 
 namespace ModS {
 struct _Anchor;

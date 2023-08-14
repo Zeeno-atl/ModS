@@ -9,11 +9,14 @@
 #	include <ModS/Route.hpp>
 
 #	ifndef MODS_INSTANCE_NAME
-#		define MODS_INSTANCE_NAME makeModSModule
-#		define MODS_INSTANCE_NAME_STRING "makeModSModule"
+#		define MODS_FACTORY_NAME          makeModSModule
+#		define MODS_STRINGIFY(x)          #x
+#		define MODS_TOSTRING(x)           MODS_STRINGIFY(x)
+#		define MODS_INSTANCE_NAME_STRING  MODS_TOSTRING(MODS_FACTORY_NAME)
 #	endif
 
-#	define MODS_MODULE(TYPE) MODS_EXPORT std::shared_ptr<ModS::AbstractModule> MODS_INSTANCE_NAME = std::make_shared<TYPE>();
+#define MODS_MODULE(TYPE) \
+MODS_EXPORT std::shared_ptr<ModS::AbstractModule> MODS_FACTORY_NAME() {return std::make_shared<TYPE>();}
 
 namespace ModS {
 class MODS_EXPORT Module : public AbstractModule {

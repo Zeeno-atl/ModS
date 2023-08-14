@@ -2,6 +2,8 @@
 #ifndef _MODS_ABSTRACT_ROUTE_HPP
 #	define _MODS_ABSTRACT_ROUTE_HPP
 
+#	include <cstdint>
+#	include <memory>
 #	include <string>
 
 namespace ModS {

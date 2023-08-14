@@ -2,9 +2,12 @@
 #include <boost/dll.hpp>
 #include <deque>
 #include <functional>
+#include <filesystem>
 #include <ranges>
 #include <utility>
 #include <numeric>
+#include <map>
+#include <unordered_map>
 
 namespace ModS {
 
@@ -23,17 +26,24 @@ public:
 	std::deque<std::string>                                                             creating;
 	std::vector<std::shared_ptr<Zeeno::Connection>>                                     connections;
 	std::map<std::filesystem::path, boost::dll::shared_library>                         modules;
+	std::map<std::filesystem::path, std::shared_ptr<AbstractModule>>                    abstractModules;
 
 	static std::string mangledFactoryName(const std::filesystem::path& path) {
 		std::vector<std::string> symbols                = boost::dll::library_info(path.c_str()).symbols();
-		const auto               getModuleFactorySymbol = std::find_if(symbols.cbegin(), symbols.cend(), [](const std::string& symbol) {
-            return symbol.find(MODS_INSTANCE_NAME_STRING) != std::string::npos;
-        });
+		auto                     getModuleFactorySymbol = std::ranges::find(symbols, MODS_INSTANCE_NAME_STRING);
+		if (getModuleFactorySymbol == symbols.end()) {
+			getModuleFactorySymbol = std::ranges::find_if(symbols, [](const std::string& symbol) {
+				return symbol.find(MODS_INSTANCE_NAME_STRING) != std::string::npos;
+			});
+		}
 		return getModuleFactorySymbol != symbols.end() ? std::string(*getModuleFactorySymbol) : "";
 	}
 
-	std::shared_ptr<AbstractModule> module(const std::filesystem::path& path) const {
-		return modules.at(path).get<std::shared_ptr<AbstractModule>>(mangledFactoryName(path));
+	std::shared_ptr<AbstractModule> mod(const std::filesystem::path& path) {
+		if (!abstractModules.contains(path)) {
+			abstractModules[path] = modules.at(path).get<std::shared_ptr<AbstractModule>()>(mangledFactoryName(path))();
+		}
+		return abstractModules[path];
 	}
 };
 
@@ -66,7 +76,7 @@ bool Injector::addDynamicObject(std::filesystem::path filepath) {
 	filepath = std::filesystem::canonical(filepath);
 	using namespace boost::dll;
 	shared_library library;
-	
+
 	library.load(filepath.string(), load_mode::load_with_altered_search_path | load_mode::rtld_lazy | load_mode::rtld_local);
 
 	if (!library.is_loaded())
@@ -77,20 +87,23 @@ bool Injector::addDynamicObject(std::filesystem::path filepath) {
 		return false;
 
 	p->modules[filepath] = std::move(library);
-	auto module          = p->module(filepath);
-	module->injector     = this;
-	p->connections.push_back(module->signalImplementationRegistered.connect(
+	auto mod             = p->mod(filepath);
+	if(!mod) {
+		return false;
+	}
+	mod->injector = this;
+	p->connections.push_back(mod->signalImplementationRegistered.connect(
 	    [this](std::shared_ptr<AbstractImplementationInfo> impl) { signalImplementationRegistered(std::move(impl)); }));
 	p->connections.push_back(
-	    module->signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { signalInterfaceRegistered(std::move(iface)); }));
-	p->connections.push_back(module->signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { signalRouteRegistered(std::move(route)); }));
-	module->bindTypes();
+	    mod->signalInterfaceRegistered.connect([this](std::shared_ptr<AbstractInterfaceInfo> iface) { signalInterfaceRegistered(std::move(iface)); }));
+	p->connections.push_back(mod->signalRouteRegistered.connect([this](std::shared_ptr<AbstractRoute> route) { signalRouteRegistered(std::move(route)); }));
+	mod->bindTypes();
 	return true;
 }
 
 void Injector::startService(std::filesystem::path filepath) {
 	filepath = std::filesystem::canonical(filepath);
-	p->module(filepath)->startService();
+	p->mod(filepath)->startService();
 }
 
 void Injector::startService() {
@@ -101,7 +114,7 @@ void Injector::startService() {
 
 void Injector::stopService(std::filesystem::path filepath) {
 	filepath = std::filesystem::canonical(filepath);
-	p->module(filepath)->stopService();
+	p->mod(filepath)->stopService();
 }
 
 void Injector::stopService() {

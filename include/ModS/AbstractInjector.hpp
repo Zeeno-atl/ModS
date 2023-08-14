@@ -2,8 +2,11 @@
 #ifndef _MODS_ABSTRACTINJECTOR_H
 #	define _MODS_ABSTRACTINJECTOR_H
 
+#	include <cstdint>
 #	include <memory>
 #	include <string>
+#	include <string_view>
+#	include <tuple>
 #	include <vector>
 
 namespace ModS {
